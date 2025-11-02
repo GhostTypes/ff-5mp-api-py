@@ -47,6 +47,9 @@ from .api.controls import (
 
 # Import utility classes
 from .api.network.utils import NetworkUtils
+from .api.network.fnet_code import FNetCode
+from .api.filament import Filament
+from .api.misc import Temperature as TempWrapper, format_scientific_notation
 from .client import FlashForgeClient
 
 # Import discovery classes
@@ -60,12 +63,23 @@ from .models import (
     DetailResponse,
     FFMachineInfo,
     FFPrinterDetail,
+    FFGcodeFileEntry,
+    FFGcodeToolData,
     FilamentArgs,
     GenericResponse,
     MachineState,
     Product,
     ProductResponse,
     Temperature,
+    SlotInfo,
+    MatlStationInfo,
+    IndepMatlInfo,
+    AD5XMaterialMapping,
+    AD5XLocalJobParams,
+    AD5XSingleColorJobParams,
+    AD5XUploadParams,
+    GCodeListResponse,
+    ThumbnailResponse,
 )
 from .tcp import (
     Endstop,
@@ -102,6 +116,8 @@ __all__ = [
     # Data models
     "FFMachineInfo",
     "FFPrinterDetail",
+    "FFGcodeFileEntry",
+    "FFGcodeToolData",
     "MachineState",
     "Temperature",
     "GenericResponse",
@@ -109,6 +125,17 @@ __all__ = [
     "ProductResponse",
     "Product",
     "FilamentArgs",
+
+    # AD5X models
+    "SlotInfo",
+    "MatlStationInfo",
+    "IndepMatlInfo",
+    "AD5XMaterialMapping",
+    "AD5XLocalJobParams",
+    "AD5XSingleColorJobParams",
+    "AD5XUploadParams",
+    "GCodeListResponse",
+    "ThumbnailResponse",
 
     # Control classes for advanced usage
     "Control",
@@ -140,6 +167,10 @@ __all__ = [
 
     # Utilities
     "NetworkUtils",
+    "FNetCode",
+    "Filament",
+    "TempWrapper",
+    "format_scientific_notation",
     "Endpoints",
     "Commands",
 

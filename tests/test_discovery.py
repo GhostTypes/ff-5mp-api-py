@@ -208,22 +208,16 @@ class TestDiscoveryIntegration:
         """Test discovery when no printers are found."""
         discovery = FlashForgePrinterDiscovery()
 
-        # Mock socket operations to simulate no responses
-        with patch('socket.socket') as mock_socket:
-            mock_listen_socket = Mock()
-            mock_discovery_socket = Mock()
-            mock_socket.side_effect = [mock_discovery_socket, mock_listen_socket]
+        # Mock the DiscoveryProtocol to return no printers
+        async def mock_wait_for_responses(self, timeout, idle_timeout):
+            return []
 
-            # Mock the receive operation to timeout (no responses)
-            async def mock_receive(*args, **kwargs):
-                raise asyncio.TimeoutError()
-
-            with patch.object(discovery, '_receive_printer_responses', return_value=[]):
-                printers = await discovery.discover_printers_async(
-                    timeout_ms=100,  # Short timeout for testing
-                    idle_timeout_ms=50,
-                    max_retries=1
-                )
+        with patch('flashforge.discovery.discovery.DiscoveryProtocol.wait_for_responses', new=mock_wait_for_responses):
+            printers = await discovery.discover_printers_async(
+                timeout_ms=100,  # Short timeout for testing
+                idle_timeout_ms=50,
+                max_retries=1
+            )
 
         assert printers == []
 
@@ -239,13 +233,32 @@ class TestDiscoveryIntegration:
             ip_address="192.168.1.100"
         )
 
-        # Mock the receive method to return our test printer
-        with patch.object(discovery, '_receive_printer_responses', return_value=[mock_printer]):
-            printers = await discovery.discover_printers_async(
-                timeout_ms=100,
-                idle_timeout_ms=50,
-                max_retries=1
-            )
+        # Mock the transport and protocol
+        mock_transport = Mock()
+        mock_transport.close = Mock()
+        mock_transport.sendto = Mock()
+
+        # Create a mock protocol that returns our test printer
+        class MockProtocol:
+            async def wait_for_responses(self, timeout, idle_timeout):
+                return [mock_printer]
+
+        mock_protocol = MockProtocol()
+
+        async def mock_create_datagram_endpoint(protocol_factory, **kwargs):
+            return (mock_transport, mock_protocol)
+
+        # Patch the event loop's create_datagram_endpoint method
+        with patch('asyncio.get_event_loop') as mock_loop:
+            loop = asyncio.get_event_loop()
+            mock_loop.return_value = loop
+
+            with patch.object(loop, 'create_datagram_endpoint', new=mock_create_datagram_endpoint):
+                printers = await discovery.discover_printers_async(
+                    timeout_ms=100,
+                    idle_timeout_ms=50,
+                    max_retries=1
+                )
 
         assert len(printers) == 1
         assert printers[0].name == "Test Printer"
@@ -271,7 +284,11 @@ class TestDiscoveryIntegration:
 
         duplicates = [printer1, printer2]
 
-        with patch.object(discovery, '_receive_printer_responses', return_value=duplicates):
+        # Mock the DiscoveryProtocol to return duplicate printers
+        async def mock_wait_for_responses(self, timeout, idle_timeout):
+            return duplicates
+
+        with patch('flashforge.discovery.discovery.DiscoveryProtocol.wait_for_responses', new=mock_wait_for_responses):
             printers = await discovery.discover_printers_async(
                 timeout_ms=100,
                 idle_timeout_ms=50,
@@ -281,6 +298,41 @@ class TestDiscoveryIntegration:
         # Should only have one printer (duplicates removed by IP)
         assert len(printers) == 1
         assert printers[0].ip_address == "192.168.1.100"
+
+
+@pytest.mark.asyncio
+class TestLiveDiscovery:
+    """Live discovery tests with real hardware (requires actual printers on network)."""
+
+    @pytest.mark.asyncio
+    async def test_discover_printers_live(self):
+        """Test discovery with actual printers on the network.
+
+        This test is not skipped by default - it will pass with 0 printers if none are found.
+        If you have FlashForge printers on your network, they should be discovered.
+        """
+        discovery = FlashForgePrinterDiscovery()
+        printers = await discovery.discover_printers_async(
+            timeout_ms=10000,
+            idle_timeout_ms=1500,
+            max_retries=3
+        )
+
+        # Print results for visibility
+        print(f"\n[Live Discovery] Found {len(printers)} printer(s):")
+        for printer in printers:
+            print(f"  - {printer.name} ({printer.ip_address}) - Serial: {printer.serial_number}")
+
+        # Test passes regardless of how many printers found
+        # This allows the test to run in CI/CD environments without printers
+        assert isinstance(printers, list)
+
+        # If printers were found, validate their structure
+        for printer in printers:
+            assert isinstance(printer, FlashForgePrinter)
+            assert printer.ip_address != ""
+            # Name or serial should be populated (at minimum)
+            assert printer.name != "" or printer.serial_number != ""
 
 
 @pytest.mark.skipif(not hasattr(socket, 'AF_INET'), reason="Socket operations not available")

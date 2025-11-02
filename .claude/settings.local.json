@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__code-context-provider-mcp__get_code_context",
+      "Bash(python -m py_compile:*)",
+      "Bash(python -c:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(python:*)",
+      "Bash(find:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

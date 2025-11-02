@@ -62,6 +62,7 @@ class FlashForgeClient:
         # Printer information cache
         self.printer_name: str = ""
         self.is_pro: bool = False
+        self._is_ad5x: bool = False
         self.firmware_version: str = ""
         self.firmware_ver: str = ""
         self.mac_address: str = ""
@@ -73,6 +74,16 @@ class FlashForgeClient:
         # Control states
         self.led_control: bool = False
         self.filtration_control: bool = False
+
+    @property
+    def is_ad5x(self) -> bool:
+        """
+        Indicates if the printer is an AD5X model.
+
+        Returns:
+            True if the printer is AD5X, False otherwise
+        """
+        return self._is_ad5x
 
     async def __aenter__(self):
         """Async context manager entry."""
@@ -159,10 +170,10 @@ class FlashForgeClient:
     def cache_details(self, info: Optional[FFMachineInfo]) -> bool:
         """
         Caches machine details from the provided FFMachineInfo object.
-        
+
         Args:
             info: The FFMachineInfo object containing printer details
-            
+
         Returns:
             True if caching is successful, False otherwise
         """
@@ -177,6 +188,7 @@ class FlashForgeClient:
         self.flash_cloud_code = info.flash_cloud_register_code or ""
         self.polar_cloud_code = info.polar_cloud_register_code or ""
         self.lifetime_print_time = info.formatted_total_run_time or ""
+        self._is_ad5x = info.is_ad5x
 
         # Format filament usage
         if info.cumulative_filament is not None:

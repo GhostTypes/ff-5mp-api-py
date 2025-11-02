@@ -154,7 +154,11 @@ class FlashForgePrinterDiscovery:
             A FlashForgePrinter object if parsing is successful, otherwise None
         """
         # Expected response length is at least 0xC4 (196 bytes) to contain name and serial
-        if not response or len(response) < 0xC4:
+        if not response:
+            logger.warning(f"Invalid response from {ip_address}: response is None or empty")
+            return None
+
+        if len(response) < 0xC4:
             logger.warning(f"Invalid response from {ip_address}, length: {len(response)}")
             return None
 

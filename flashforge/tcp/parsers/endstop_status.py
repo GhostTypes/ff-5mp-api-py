@@ -145,6 +145,16 @@ class EndstopStatus:
         try:
             data = replay.split('\n')
 
+            # Validate that we have enough lines for a valid response
+            # A valid M119 response should have at least 2 lines (command echo + endstop data)
+            if len(data) < 2:
+                return None
+
+            # Check if the data looks like a valid M119 response
+            # Should contain "Endstop" in the second line
+            if len(data) > 1 and "Endstop" not in data[1]:
+                return None
+
             # Parse endstop data (line 1)
             if len(data) > 1:
                 self.endstop = Endstop(data[1])

@@ -1,11 +1,13 @@
 """
 FlashForge Python API - Files Module
 """
+import base64
 from typing import TYPE_CHECKING, List, Optional
 
 import aiohttp
 
-from ...models.responses import GenericResponse
+from ...models.machine_info import FFGcodeFileEntry
+from ...models.responses import GenericResponse, GCodeListResponse, ThumbnailResponse
 from ..constants.endpoints import Endpoints
 from ..network.utils import NetworkUtils
 
@@ -49,12 +51,14 @@ class Files:
         """
         return await self.get_file_list()
 
-    async def get_recent_file_list(self) -> Optional[GenericResponse]:
+    async def get_recent_file_list(self) -> List[FFGcodeFileEntry]:
         """
-        Retrieves a list of recently printed files from the printer.
-        
+        Retrieves a list of the 10 most recently printed files from the printer's API.
+        For AD5X and newer printers, returns detailed file entries with material info.
+        For older printers, returns basic file entries with normalized data.
+
         Returns:
-            A GenericResponse containing the recent file list, or None if retrieval fails.
+            A list of FFGcodeFileEntry objects. Returns an empty list if the request fails or an error occurs.
         """
         payload = {
             "serialNumber": self.client.serial_number,
@@ -69,7 +73,7 @@ class Files:
                     headers={"Content-Type": "application/json"}
                 ) as response:
                     if response.status != 200:
-                        return None
+                        return []
 
                     # Fix for FlashForge printer's malformed Content-Type header
                     # Some printers return "appliation/json" instead of "application/json"
@@ -81,25 +85,52 @@ class Files:
                         import json
                         data = json.loads(text)
 
-                    if NetworkUtils.is_ok(data):
-                        return GenericResponse(**data)
-                    else:
-                        print(f"GetRecentFileList error: {NetworkUtils.get_error_message(data)}")
-                        return None
+                    if not NetworkUtils.is_ok(data):
+                        print(f"Error retrieving file list: {NetworkUtils.get_error_message(data)}")
+                        return []
+
+                    # Parse the response using GCodeListResponse
+                    result = GCodeListResponse(**data)
+
+                    # AD5X and newer printers provide detailed info in gcodeListDetail
+                    if result.gcode_list_detail and len(result.gcode_list_detail) > 0:
+                        return result.gcode_list_detail
+
+                    # Fallback for older printers using gcodeList
+                    if result.gcode_list and len(result.gcode_list) > 0:
+                        # Check if it's a list of strings or already FFGcodeFileEntry objects
+                        first_item = result.gcode_list[0]
+
+                        if isinstance(first_item, str):
+                            # Convert string array to FFGcodeFileEntry objects
+                            return [
+                                FFGcodeFileEntry(
+                                    gcode_file_name=file_name,
+                                    printing_time=0
+                                )
+                                for file_name in result.gcode_list
+                            ]
+                        else:
+                            # Already FFGcodeFileEntry objects
+                            return result.gcode_list
+
+                    return []
 
         except Exception as err:
-            print(f"GetRecentFileList request error: {err}")
-            return None
+            print(f"GetRecentFileList error: {err}")
+            return []
 
-    async def get_gcode_thumbnail(self, file_name: str) -> Optional[GenericResponse]:
+    async def get_gcode_thumbnail(self, file_name: str) -> Optional[bytes]:
         """
-        Retrieves the thumbnail image for a G-code file.
-        
+        Retrieves the thumbnail image for a specified G-code file.
+        The image data is returned as bytes.
+
         Args:
-            file_name: The name of the G-code file to get the thumbnail for.
-            
+            file_name: The name of the G-code file (e.g., "my_print.gcode") for which to retrieve the thumbnail.
+
         Returns:
-            A GenericResponse containing the thumbnail data, or None if retrieval fails.
+            Bytes containing the thumbnail image data (decoded from base64),
+            or None if the request fails, the file has no thumbnail, or an error occurs.
         """
         payload = {
             "serialNumber": self.client.serial_number,
@@ -128,11 +159,13 @@ class Files:
                         data = json.loads(text)
 
                     if NetworkUtils.is_ok(data):
-                        return GenericResponse(**data)
+                        # Parse response and return decoded image bytes
+                        result = ThumbnailResponse(**data)
+                        return base64.b64decode(result.image_data)
                     else:
-                        print(f"GetGCodeThumbnail error: {NetworkUtils.get_error_message(data)}")
+                        print(f"Error retrieving thumbnail: {NetworkUtils.get_error_message(data)}")
                         return None
 
         except Exception as err:
-            print(f"GetGCodeThumbnail request error: {err}")
+            print(f"GetGcodeThumbnail error: {err}")
             return None

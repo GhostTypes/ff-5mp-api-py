@@ -103,6 +103,7 @@ class MachineInfoParser:
                 # Fan speeds
                 chamber_fan_speed=getattr(detail, "chamber_fan_speed", 0) or 0,
                 cooling_fan_speed=getattr(detail, "cooling_fan_speed", 0) or 0,
+                cooling_fan_left_speed=getattr(detail, "cooling_fan_left_speed", None),
 
                 # Cumulative stats
                 cumulative_filament=getattr(detail, "cumulative_filament", 0) or 0,
@@ -137,6 +138,7 @@ class MachineInfoParser:
                 firmware_version=getattr(detail, "firmware_version", "") or "",
                 name=getattr(detail, "name", "") or "",
                 is_pro="Pro" in (getattr(detail, "name", "") or ""),
+                is_ad5x="AD5X" in (getattr(detail, "name", "") or "").upper(),
                 nozzle_size=getattr(detail, "nozzle_model", "") or "",
 
                 # Temperatures
@@ -174,6 +176,11 @@ class MachineInfoParser:
                 print_eta=print_eta,
                 formatted_run_time=formatted_run_time,
                 formatted_total_run_time=formatted_total_run_time,
+
+                # AD5X Material Station
+                has_matl_station=getattr(detail, "has_matl_station", None),
+                matl_station_info=getattr(detail, "matl_station_info", None),
+                indep_matl_info=getattr(detail, "indep_matl_info", None),
             )
 
             return machine_info
