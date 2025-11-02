@@ -7,7 +7,7 @@ name = "flashforge-python-api"
 version = "1.0.0"
 description = "A comprehensive Python library for controlling FlashForge 3D printers"
 readme = "README.md"
-license = "ISC"
+license = "MIT"
 authors = [
     { name = "GhostTypes", email = "notghosttypes@gmail.com" },
 ]

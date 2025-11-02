@@ -105,7 +105,7 @@ from .tcp import (
 
 __version__ = "1.0.0"
 __author__ = "FlashForge Python API Contributors"
-__email__ = "developer@example.com"
+__email__ = "notghosttypes@gmail.com"
 __description__ = "Python library for controlling FlashForge 3D printers"
 
 # Public API - Main classes most users will need
