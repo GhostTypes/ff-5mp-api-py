@@ -5,7 +5,7 @@ import asyncio
 import socket
 import sys
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -14,6 +14,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from flashforge.discovery import FlashForgePrinter, FlashForgePrinterDiscovery
+from flashforge.discovery.discovery import DiscoveryProtocol
 
 
 class TestFlashForgePrinter:
@@ -199,6 +200,81 @@ class TestFlashForgePrinterDiscovery:
         assert "Hex dump:" in captured.out
         assert "ASCII dump:" in captured.out
 
+    @pytest.mark.asyncio
+    async def test_discover_printers_network_interface_down(self):
+        """Discovery returns empty list when no interfaces available."""
+        discovery = FlashForgePrinterDiscovery()
+        loop = asyncio.get_event_loop()
+
+        fake_transport = Mock()
+        fake_transport.sendto = Mock()
+        fake_transport.close = Mock()
+
+        fake_protocol = AsyncMock()
+        fake_protocol.wait_for_responses = AsyncMock(return_value=[])
+
+        with patch.object(
+            discovery,
+            "_get_broadcast_addresses",
+            return_value=[]
+        ), patch.object(
+            loop,
+            "create_datagram_endpoint",
+            AsyncMock(return_value=(fake_transport, fake_protocol))
+        ), patch(
+            "flashforge.discovery.discovery.asyncio.sleep",
+            new=AsyncMock(return_value=None)
+        ):
+            printers = await discovery.discover_printers_async(timeout_ms=5, idle_timeout_ms=5, max_retries=1)
+
+        assert printers == []
+
+    @pytest.mark.asyncio
+    async def test_discover_printers_broadcast_blocked(self):
+        """Discovery handles broadcast permission errors gracefully."""
+        discovery = FlashForgePrinterDiscovery()
+        loop = asyncio.get_event_loop()
+
+        class FailingTransport:
+            def __init__(self):
+                self.closed = False
+
+            def sendto(self, data, addr):
+                raise PermissionError("Broadcast blocked")
+
+            def close(self):
+                self.closed = True
+
+        fake_transport = FailingTransport()
+        fake_protocol = AsyncMock()
+        fake_protocol.wait_for_responses = AsyncMock(return_value=[])
+
+        with patch.object(
+            discovery,
+            "_get_broadcast_addresses",
+            return_value=["192.168.1.255"]
+        ), patch.object(
+            loop,
+            "create_datagram_endpoint",
+            AsyncMock(return_value=(fake_transport, fake_protocol))
+        ), patch(
+            "flashforge.discovery.discovery.asyncio.sleep",
+            new=AsyncMock(return_value=None)
+        ):
+            printers = await discovery.discover_printers_async(timeout_ms=5, idle_timeout_ms=5, max_retries=1)
+
+        assert printers == []
+
+    @pytest.mark.asyncio
+    async def test_discover_printers_malformed_response(self):
+        """Malformed responses are skipped without crashing."""
+        discovery = FlashForgePrinterDiscovery()
+        discovery_protocol = DiscoveryProtocol(discovery)
+
+        discovery_protocol.datagram_received(b"short", ("192.168.1.120", 18007))
+
+        assert discovery_protocol.printers == []
+
 
 class TestDiscoveryIntegration:
     """Integration tests for discovery functionality."""
@@ -288,7 +364,30 @@ class TestDiscoveryIntegration:
         async def mock_wait_for_responses(self, timeout, idle_timeout):
             return duplicates
 
-        with patch('flashforge.discovery.discovery.DiscoveryProtocol.wait_for_responses', new=mock_wait_for_responses):
+        fake_transport = Mock()
+        fake_transport.sendto = Mock()
+        fake_transport.close = Mock()
+
+        fake_protocol = Mock()
+
+        async def mock_create_datagram_endpoint(protocol_factory, **kwargs):
+            protocol = protocol_factory()
+            return fake_transport, protocol
+
+        with patch.object(
+            FlashForgePrinterDiscovery,
+            "_get_broadcast_addresses",
+            return_value=["192.168.1.255"]
+        ), patch(
+            'flashforge.discovery.discovery.asyncio.get_event_loop'
+        ) as mock_get_loop, patch(
+            'flashforge.discovery.discovery.DiscoveryProtocol.wait_for_responses',
+            new=mock_wait_for_responses
+        ):
+            loop = Mock()
+            loop.create_datagram_endpoint = AsyncMock(side_effect=mock_create_datagram_endpoint)
+            mock_get_loop.return_value = loop
+
             printers = await discovery.discover_printers_async(
                 timeout_ms=100,
                 idle_timeout_ms=50,
@@ -345,15 +444,21 @@ class TestDiscoveryNetwork:
         discovery = FlashForgePrinterDiscovery()
 
         # Test discovery socket creation
-        discovery_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        discovery_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        discovery_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        discovery_socket.close()
+        with patch("socket.socket") as mock_socket:
+            discovery_socket = mock_socket.return_value
+            discovery_socket.setsockopt.return_value = None
+            discovery_socket.close.return_value = None
 
-        # Test listening socket creation
-        listen_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        listen_socket.close()
+            # Discovery socket
+            sock_instance = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock_instance.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            sock_instance.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock_instance.close()
+
+            # Listening socket
+            listen_instance = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            listen_instance.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            listen_instance.close()
 
         # If we get here without exceptions, socket creation works
         assert True

@@ -10,6 +10,7 @@ from ...models.machine_info import FFGcodeFileEntry
 from ...models.responses import GenericResponse, GCodeListResponse, ThumbnailResponse
 from ..constants.endpoints import Endpoints
 from ..network.utils import NetworkUtils
+from pydantic import ValidationError
 
 if TYPE_CHECKING:
     from ...client import FlashForgeClient
@@ -90,7 +91,22 @@ class Files:
                         return []
 
                     # Parse the response using GCodeListResponse
-                    result = GCodeListResponse(**data)
+                    try:
+                        result = GCodeListResponse(**data)
+                    except ValidationError:
+                        raw_list = data.get("gcodeList", [])
+                        if isinstance(raw_list, list):
+                            entries: List[FFGcodeFileEntry] = []
+                            for file_name in raw_list:
+                                if isinstance(file_name, str):
+                                    entries.append(
+                                        FFGcodeFileEntry(
+                                            gcodeFileName=file_name,
+                                            printingTime=0,
+                                        )
+                                    )
+                            return entries
+                        return []
 
                     # AD5X and newer printers provide detailed info in gcodeListDetail
                     if result.gcode_list_detail and len(result.gcode_list_detail) > 0:
@@ -105,8 +121,8 @@ class Files:
                             # Convert string array to FFGcodeFileEntry objects
                             return [
                                 FFGcodeFileEntry(
-                                    gcode_file_name=file_name,
-                                    printing_time=0
+                                    gcodeFileName=file_name,
+                                    printingTime=0
                                 )
                                 for file_name in result.gcode_list
                             ]

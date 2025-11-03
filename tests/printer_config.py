@@ -17,7 +17,7 @@ import pytest
 # =============================================================================
 
 # Set to True to skip tests that require a real printer connection
-SKIP_LIVE_TESTS = False
+SKIP_LIVE_TESTS = True
 
 # Your printer's IP address on the local network
 PRINTER_IP = "192.168.1.120"
@@ -30,6 +30,12 @@ CHECK_CODE = "0e35a229"
 
 # Optional: Printer name for display in test output
 PRINTER_NAME = "FlashForge AD5X"
+
+# 5M Pro Configuration
+PRINTER_5M_PRO_IP = "192.168.1.140"
+PRINTER_5M_PRO_SERIAL = "SNMOMC9900728"
+PRINTER_5M_PRO_CHECK_CODE = "your_check_code_here"
+PRINTER_5M_PRO_NAME = "Adventurer 5M Pro"
 
 # =============================================================================
 # HELPER FUNCTIONS
@@ -48,6 +54,21 @@ def get_test_printer_config() -> dict:
         "serial_number": SERIAL_NUMBER,
         "check_code": CHECK_CODE,
         "name": PRINTER_NAME,
+    }
+
+
+def get_5m_pro_config() -> dict:
+    """
+    Returns the 5M Pro printer configuration.
+
+    Returns:
+        dict: Configuration with keys 'ip', 'serial_number', 'check_code', 'name'
+    """
+    return {
+        "ip": PRINTER_5M_PRO_IP,
+        "serial_number": PRINTER_5M_PRO_SERIAL,
+        "check_code": PRINTER_5M_PRO_CHECK_CODE,
+        "name": PRINTER_5M_PRO_NAME,
     }
 
 
