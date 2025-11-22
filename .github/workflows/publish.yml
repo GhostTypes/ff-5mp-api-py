@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 1.0.1). Leave empty to auto-increment patch version if tag exists.'
+        description: 'Version to release (e.g., 1.0.1). Leave empty to auto-generate timestamped version (e.g. 1.0.0-2023...) if tag exists.'
         required: false
         type: string
 
@@ -41,6 +41,7 @@ jobs:
           import re
           import subprocess
           import sys
+          from datetime import datetime
 
           def get_current_version():
               with open("pyproject.toml", "r") as f:
@@ -54,8 +55,6 @@ jobs:
               with open("pyproject.toml", "r") as f:
                   content = f.read()
 
-              # Replace version = "..." or version = '...'
-              # We use regex to ensure we match the top-level project version
               new_content = re.sub(r'version\s*=\s*["\'][^"\']+["\']', f'version = "{new_version}"', content, count=1)
 
               with open("pyproject.toml", "w") as f:
@@ -69,56 +68,54 @@ jobs:
               except subprocess.CalledProcessError:
                   return False
 
-          def bump_patch(version):
-              parts = version.split('.')
-              if len(parts) < 3:
-                  parts.extend(['0'] * (3 - len(parts)))
-              parts[-1] = str(int(parts[-1]) + 1)
-              return ".".join(parts)
-
           input_version = os.environ.get("INPUT_VERSION")
           ref_name = os.environ.get("REF_NAME")
           current_version = get_current_version()
           print(f"Current version in pyproject.toml: {current_version}")
 
           new_version = current_version
-          should_update = False
+          should_commit = False
+          should_push_commit = False
 
           if input_version:
+              # Manual version input
               if input_version != current_version:
                   new_version = input_version
-                  should_update = True
-                  print(f"Using input version: {new_version}")
+                  should_commit = True
+                  should_push_commit = True
+                  print(f"Using input version: {new_version} (Will update, commit, and push)")
               else:
-                  print("Input version matches current version.")
+                  print("Input version matches current version. (No file change needed)")
           else:
-              # Check if tag exists for current version
+              # No input - Check for existing tag
               tag = f"v{current_version}"
               if tag_exists(tag):
-                  print(f"Tag {tag} already exists. Bumping patch version.")
-                  new_version = bump_patch(current_version)
-                  should_update = True
-                  print(f"New auto-bumped version: {new_version}")
+                  # Tag exists, generate timestamp version
+                  timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                  new_version = f"{current_version}-{timestamp}"
+                  should_commit = True
+                  should_push_commit = False # Do not push ephemeral version to main
+                  print(f"Tag {tag} exists. Generated timestamp version: {new_version} (Will commit locally but NOT push to branch)")
               else:
-                  print(f"Tag {tag} does not exist. Using current version.")
+                  print(f"Tag {tag} does not exist. Using current version: {current_version} (First release of this version)")
 
           # Configure git
           subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=True)
           subprocess.run(["git", "config", "user.email", "github-actions[bot]@users.noreply.github.com"], check=True)
 
-          if should_update:
+          if should_commit:
               update_pyproject(new_version)
               subprocess.run(["git", "add", "pyproject.toml"], check=True)
-              subprocess.run(["git", "commit", "-m", f"Bump version to {new_version}"], check=True)
+              subprocess.run(["git", "commit", "-m", f"Release {new_version}"], check=True)
 
-              # Pull changes to avoid conflicts before pushing
-              # We fetch origin first
-              subprocess.run(["git", "fetch", "origin", ref_name], check=True)
-              # Attempt to pull --rebase
-              subprocess.run(["git", "pull", "--rebase", "origin", ref_name], check=True)
-
-              # Push to specific branch
-              subprocess.run(["git", "push", "origin", f"HEAD:{ref_name}"], check=True)
+              if should_push_commit:
+                   # Pull changes to avoid conflicts before pushing
+                  subprocess.run(["git", "fetch", "origin", ref_name], check=True)
+                  subprocess.run(["git", "pull", "--rebase", "origin", ref_name], check=True)
+                  # Push to specific branch
+                  subprocess.run(["git", "push", "origin", f"HEAD:{ref_name}"], check=True)
+              else:
+                  print("Skipping push of commit (Ephemeral/Timestamp release).")
 
           # Create tag if it doesn't exist
           tag_name = f"v{new_version}"
