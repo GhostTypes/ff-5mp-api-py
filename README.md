@@ -1,74 +1,162 @@
-# 🖨️ FlashForge Python API
+<div align="center">
+
+# FlashForge Python API
 
 A comprehensive Python library for controlling FlashForge 3D printers.
 
-## ✨ Features
+[![PyPI](https://img.shields.io/pypi/v/flashforge-python-api?style=for-the-badge&logo=pypi&logoColor=white)](https://pypi.org/project/flashforge-python-api/)
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](LICENSE)
 
-- **🎮 Full Printer Control**: Movement, temperature, speed, LED, filtration, camera control
-- **📋 Job Management**: Start, pause, resume, cancel prints, file upload and management  
-- **📊 Real-time Monitoring**: Live status, temperature, progress, and machine state tracking
-- **🔍 Network Discovery**: Automatic printer discovery via UDP broadcast
-- **🔄 Dual Communication**: HTTP API (modern) + TCP G-code (legacy) support
-- **🛡️ Type Safety**: Full type hints and Pydantic models for robust development
-- **⚡ Async Support**: Native async/await support for all operations
-- **🖼️ Advanced Features**: Thumbnail extraction, endstop monitoring, print progress tracking
+</div>
 
-## 🚀 Quick Start
-> 💡 The "new" HTTP API requires LAN-mode, and a check code for authentication. [This](https://www.youtube.com/watch?v=krdEGccZuKo) video shows how to set up LAN-mode, and get the code.
+<div align="center">
+
+## Features & Capabilities
+
+| Feature | Description |
+| :--- | :--- |
+| **Printer Discovery** | Automatic UDP broadcast discovery of printers on the network |
+| **Full Control** | Movement (G1), Homing (G28), Temperature (M104/M140), Fans, LED |
+| **Real-time Monitoring** | Live status (M119), Temperatures (M105), Print Progress (M27) |
+| **Job Management** | Start, Pause, Resume, Cancel, File Upload & Listing |
+| **Advanced Parsing** | Thumbnail extraction (M662), Endstop monitoring, Machine state |
+| **Dual Protocol** | Modern HTTP API + Legacy TCP G-code support |
+| **Async Support** | Native async/await implementation for all operations |
+| **Type Safety** | Full type hints and Pydantic models for robust development |
+
+<br>
+
+## Supported Hardware
+
+| Model | Support Level | Connection Type |
+| :--- | :--- | :--- |
+| **FlashForge Adventurer 5M / 5M Pro** | Full Support | HTTP + TCP |
+| **FlashForge Adventurer 5X** | Full Support | HTTP + TCP |
+| **FlashForge Adventurer 3 / 4** | Partial Support | TCP (Legacy) |
+| **Other Networked FlashForge Printers** | Experimental | TCP (Generic) |
+
+<br>
+
+## Compatible Slicers
+
+| Slicer | Compatibility | Notes |
+| :--- | :--- | :--- |
+| **OrcaSlicer** | High | Recommended for Adventurer 5M series |
+| **FlashPrint** | Full | Official FlashForge slicer |
+| **Orca-FlashForge** | High | Optimized for FlashForge printers |
+| **Cura / PrusaSlicer** | Basic | Requires correct G-code flavor |
+
+<br>
+
+## Installation
+
+| Command |
+| :--- |
+| `pip install flashforge-python-api` |
+
+</div>
+
+<div align="center">
+<h2>Usage Examples</h2>
+</div>
+
+<div align="center">
+<h3>Printer Discovery</h3>
+Discover printers on your local network automatically.
+</div>
 
 ```python
-from flashforge import FlashForgeClient, FlashForgePrinterDiscovery
+from flashforge import FlashForgePrinterDiscovery
+import asyncio
 
-# Find printers on the network
-discovery = FlashForgePrinterDiscovery()
-printers = await discovery.discover_printers_async()
+async def discover():
+    discovery = FlashForgePrinterDiscovery()
+    printers = await discovery.discover_printers_async()
+    for printer in printers:
+        print(f"Found: {printer.name} at {printer.ip_address}")
 
-# Connect to your printer
-client = FlashForgeClient(
-    host="192.168.1.100",  # Your printer's IP
-    serial="ABCD1234",     # Your printer's serial
-    check_code="12345678"  # Your printer's check code
-)
-
-# Basic operations
-await client.info.get_machine_status()  # Get printer status
-await client.temp_control.set_bed_temp(60)  # Set bed temperature
-await client.control.home_xyz()  # Home all axes
+asyncio.run(discover())
 ```
 
-## 📦 Installation & Setup
+<div align="center">
+<h3>Basic Control</h3>
+Connect to a printer and perform basic operations like setting temperature and homing.
+</div>
 
-```bash
-# Clone the repository
-git clone https://github.com/your-username/flashforge-python-api.git
-cd flashforge-python-api
+```python
+from flashforge import FlashForgeClient
+import asyncio
 
-# Setup & Install
-uv sync                    # Install core dependencies
-uv sync --all-extras      # Install with all optional dependencies
+async def control_printer():
+    # Initialize client with printer details
+    client = FlashForgeClient("192.168.1.100", "SERIAL_NUMBER", "CHECK_CODE")
+
+    if await client.initialize():
+        print(f"Connected to {client.printer_name}")
+
+        # Set bed temperature to 60°C
+        await client.temp_control.set_bed_temp(60)
+
+        # Home all axes
+        await client.control.home_xyz()
+
+        await client.dispose()
+
+asyncio.run(control_printer())
 ```
 
-## 🔧 Requirements
+<div align="center">
+<h3>Real-time Status Monitoring</h3>
+Monitor printer status, temperatures, and print progress.
+</div>
 
-- **🐍 Python**: 3.8+ (recommended: 3.11+)
-- **🖨️ Printer**: FlashForge with network connectivity
-- **🌐 Network**: Printer and computer on same network for discovery
-- **🔑 Credentials**: Printer serial number and check code
+```python
+from flashforge import FlashForgeClient
+import asyncio
 
-## 🎯 Supported Models
+async def monitor_printer():
+    async with FlashForgeClient("192.168.1.100", "SERIAL", "CODE") as client:
+        # Get comprehensive status
+        status = await client.get_printer_status()
+        print(f"Machine State: {status.machine_state}")
 
-**✅ Tested with:**
-- FlashForge Adventurer 5M Series
-- FlashForge Adventurer 4
+        # Get temperatures via TCP
+        temps = await client.tcp_client.get_temp_info()
+        if temps:
+            bed = temps.get_bed_temp()
+            extruder = temps.get_extruder_temp()
+            print(f"Bed: {bed.get_current()}°C / {bed.get_target()}°C")
+            print(f"Extruder: {extruder.get_current()}°C / {extruder.get_target()}°C")
 
-**💫 Should work with:**
-- FlashForge printers with network connectivity
-- Printers supporting HTTP API (new) and/or TCP G-code (legacy)
+        # Check print progress
+        layer_p, sd_p, current_layer = await client.tcp_client.get_print_progress()
+        print(f"Progress: {layer_p}% (Layer {current_layer})")
 
-> 💡 **Note**: Some features (camera control, filtration) are model-specific and will be automatically detected.
+asyncio.run(monitor_printer())
+```
 
-## 🌟 Related Projects
-- **💻 C# API (Windows)**: [ff-5mp-api](https://github.com/GhostTypes/ff-5mp-api)
-- **🌐 TypeScript API (Cross-Platform)**: [ff-5mp-api-ts](https://github.com/GhostTypes/ff-5mp-api-ts)
-- **🎨 FlashForgeUI (Electron, Cross-Platform)**: [FlashForgeUI-Electron](https://github.com/Parallel-7/FlashForgeUI-Electron)
+<div align="center">
+<h3>File Operations & Thumbnails</h3>
+List files on the printer and extract thumbnails.
+</div>
 
+```python
+from flashforge import FlashForgeClient
+import asyncio
+
+async def file_ops():
+    async with FlashForgeClient("192.168.1.100", "SERIAL", "CODE") as client:
+        # List files
+        files = await client.files.get_file_list()
+        for filename in files:
+            print(f"File: {filename}")
+
+            # Get thumbnail
+            thumb = await client.tcp_client.get_thumbnail(filename)
+            if thumb and thumb.has_image_data():
+                print(f"Thumbnail found: {len(thumb.get_image_bytes())} bytes")
+                # thumb.save_to_file_sync(f"{filename}.png")
+
+asyncio.run(file_ops())
+```
