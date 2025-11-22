@@ -14,16 +14,16 @@ A comprehensive Python library for controlling FlashForge 3D printers.
 
 ## Features & Capabilities
 
-| Feature | Description | Status |
-| :--- | :--- | :--- |
-| **Printer Discovery** | Automatic UDP broadcast discovery of printers on the network | Ready |
-| **Full Control** | Movement (G1), Homing (G28), Temperature (M104/M140), Fans, LED | Ready |
-| **Real-time Monitoring** | Live status (M119), Temperatures (M105), Print Progress (M27) | Ready |
-| **Job Management** | Start, Pause, Resume, Cancel, File Upload & Listing | Ready |
-| **Advanced Parsing** | Thumbnail extraction (M662), Endstop monitoring, Machine state | Ready |
-| **Dual Protocol** | Modern HTTP API + Legacy TCP G-code support | Ready |
-| **Async Support** | Native async/await implementation for all operations | Ready |
-| **Type Safety** | Full type hints and Pydantic models for robust development | Ready |
+| Feature | Description |
+| :--- | :--- |
+| **Printer Discovery** | Automatic UDP broadcast discovery of printers on the network |
+| **Full Control** | Movement (G1), Homing (G28), Temperature (M104/M140), Fans, LED |
+| **Real-time Monitoring** | Live status (M119), Temperatures (M105), Print Progress (M27) |
+| **Job Management** | Start, Pause, Resume, Cancel, File Upload & Listing |
+| **Advanced Parsing** | Thumbnail extraction (M662), Endstop monitoring, Machine state |
+| **Dual Protocol** | Modern HTTP API + Legacy TCP G-code support |
+| **Async Support** | Native async/await implementation for all operations |
+| **Type Safety** | Full type hints and Pydantic models for robust development |
 
 <br>
 
