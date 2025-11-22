@@ -1,0 +1,144 @@
+name: Publish to GitHub Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.1). Leave empty to auto-increment patch version if tag exists.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Hatch
+        run: |
+          pip install hatch
+
+      - name: Determine and Update Version
+        id: version
+        shell: python
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          import os
+          import re
+          import subprocess
+          import sys
+
+          def get_current_version():
+              with open("pyproject.toml", "r") as f:
+                  content = f.read()
+              match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', content)
+              if match:
+                  return match.group(1)
+              sys.exit("Could not find version in pyproject.toml")
+
+          def update_pyproject(new_version):
+              with open("pyproject.toml", "r") as f:
+                  content = f.read()
+
+              # Replace version = "..." or version = '...'
+              # We use regex to ensure we match the top-level project version
+              new_content = re.sub(r'version\s*=\s*["\'][^"\']+["\']', f'version = "{new_version}"', content, count=1)
+
+              with open("pyproject.toml", "w") as f:
+                  f.write(new_content)
+              print(f"Updated pyproject.toml to version {new_version}")
+
+          def tag_exists(tag):
+              try:
+                  subprocess.check_output(["git", "rev-parse", tag], stderr=subprocess.STDOUT)
+                  return True
+              except subprocess.CalledProcessError:
+                  return False
+
+          def bump_patch(version):
+              parts = version.split('.')
+              if len(parts) < 3:
+                  parts.extend(['0'] * (3 - len(parts)))
+              parts[-1] = str(int(parts[-1]) + 1)
+              return ".".join(parts)
+
+          input_version = os.environ.get("INPUT_VERSION")
+          ref_name = os.environ.get("REF_NAME")
+          current_version = get_current_version()
+          print(f"Current version in pyproject.toml: {current_version}")
+
+          new_version = current_version
+          should_update = False
+
+          if input_version:
+              if input_version != current_version:
+                  new_version = input_version
+                  should_update = True
+                  print(f"Using input version: {new_version}")
+              else:
+                  print("Input version matches current version.")
+          else:
+              # Check if tag exists for current version
+              tag = f"v{current_version}"
+              if tag_exists(tag):
+                  print(f"Tag {tag} already exists. Bumping patch version.")
+                  new_version = bump_patch(current_version)
+                  should_update = True
+                  print(f"New auto-bumped version: {new_version}")
+              else:
+                  print(f"Tag {tag} does not exist. Using current version.")
+
+          # Configure git
+          subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=True)
+          subprocess.run(["git", "config", "user.email", "github-actions[bot]@users.noreply.github.com"], check=True)
+
+          if should_update:
+              update_pyproject(new_version)
+              subprocess.run(["git", "add", "pyproject.toml"], check=True)
+              subprocess.run(["git", "commit", "-m", f"Bump version to {new_version}"], check=True)
+
+              # Pull changes to avoid conflicts before pushing
+              # We fetch origin first
+              subprocess.run(["git", "fetch", "origin", ref_name], check=True)
+              # Attempt to pull --rebase
+              subprocess.run(["git", "pull", "--rebase", "origin", ref_name], check=True)
+
+              # Push to specific branch
+              subprocess.run(["git", "push", "origin", f"HEAD:{ref_name}"], check=True)
+
+          # Create tag if it doesn't exist
+          tag_name = f"v{new_version}"
+          if not tag_exists(tag_name):
+              print(f"Creating tag {tag_name}")
+              subprocess.run(["git", "tag", tag_name], check=True)
+              subprocess.run(["git", "push", "origin", tag_name], check=True)
+          else:
+             print(f"Tag {tag_name} already exists.")
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+              fh.write(f"version={new_version}\n")
+
+      - name: Build
+        run: hatch build
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          files: dist/*
+          generate_release_notes: true
