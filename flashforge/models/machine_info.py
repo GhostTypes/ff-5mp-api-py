@@ -114,7 +114,7 @@ class FFPrinterDetail(BaseModel):
     estimated_left_weight: Optional[float] = Field(default=None, alias="estimatedLeftWeight")
     estimated_right_len: Optional[float] = Field(default=None, alias="estimatedRightLen")
     estimated_right_weight: Optional[float] = Field(default=None, alias="estimatedRightWeight")
-    estimated_time: Optional[int] = Field(default=None, alias="estimatedTime")
+    estimated_time: Optional[float] = Field(default=None, alias="estimatedTime")
     external_fan_status: Optional[str] = Field(default=None, alias="externalFanStatus")
     fill_amount: Optional[float] = Field(default=None, alias="fillAmount")
     firmware_version: Optional[str] = Field(default=None, alias="firmwareVersion")
@@ -191,7 +191,7 @@ class FFMachineInfo(BaseModel):
     # Current print estimates
     est_length: float = 0.0
     est_weight: float = 0.0
-    estimated_time: int = 0
+    estimated_time: float = 0.0
 
     # Fans & LED status
     external_fan_on: bool = False

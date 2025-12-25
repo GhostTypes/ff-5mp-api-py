@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flashforge-python-api"
-version = "1.0.0"
+version = "1.0.1"
 description = "A comprehensive Python library for controlling FlashForge 3D printers"
 readme = "README.md"
 license = "MIT"

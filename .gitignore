@@ -116,3 +116,6 @@ coverage.xml
 thumb_*.png
 thumbnail_*.png
 test_*.png
+
+# PyPI credentials
+.pypirc
