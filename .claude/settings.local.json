@@ -6,7 +6,8 @@
       "Bash(python -c:*)",
       "Bash(python -m pytest:*)",
       "Bash(python:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Skill(readme-generator)"
     ],
     "deny": [],
     "ask": []
