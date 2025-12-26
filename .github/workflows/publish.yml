@@ -1,11 +1,11 @@
-name: Publish to GitHub Release
+name: Publish Release
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 1.0.1). Leave empty to auto-generate timestamped version (e.g. 1.0.0-2023...) if tag exists.'
-        required: false
+        description: 'Version to release (e.g., 1.0.2)'
+        required: true
         type: string
 
 permissions:
@@ -26,116 +26,89 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install Hatch
+      - name: Install build tools
         run: |
-          pip install hatch
+          pip install hatch twine
 
-      - name: Determine and Update Version
-        id: version
-        shell: python
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
-          REF_NAME: ${{ github.ref_name }}
+      - name: Validate version input
+        id: validate
         run: |
-          import os
-          import re
-          import subprocess
-          import sys
-          from datetime import datetime
+          VERSION="${{ inputs.version }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Version must be in format X.Y.Z (e.g., 1.0.2)"
+            exit 1
+          fi
 
-          def get_current_version():
-              with open("pyproject.toml", "r") as f:
-                  content = f.read()
-              match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', content)
-              if match:
-                  return match.group(1)
-              sys.exit("Could not find version in pyproject.toml")
+          # Check if tag already exists
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Error: Tag v$VERSION already exists"
+            exit 1
+          fi
 
-          def update_pyproject(new_version):
-              with open("pyproject.toml", "r") as f:
-                  content = f.read()
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-              new_content = re.sub(r'version\s*=\s*["\'][^"\']+["\']', f'version = "{new_version}"', content, count=1)
+      - name: Update version in pyproject.toml
+        run: |
+          VERSION="${{ steps.validate.outputs.version }}"
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
 
-              with open("pyproject.toml", "w") as f:
-                  f.write(new_content)
-              print(f"Updated pyproject.toml to version {new_version}")
+          # Verify the change
+          grep "^version = \"$VERSION\"" pyproject.toml || {
+            echo "Error: Failed to update version in pyproject.toml"
+            exit 1
+          }
 
-          def tag_exists(tag):
-              try:
-                  subprocess.check_output(["git", "rev-parse", tag], stderr=subprocess.STDOUT)
-                  return True
-              except subprocess.CalledProcessError:
-                  return False
+          echo "Updated pyproject.toml to version $VERSION"
 
-          input_version = os.environ.get("INPUT_VERSION")
-          ref_name = os.environ.get("REF_NAME")
-          current_version = get_current_version()
-          print(f"Current version in pyproject.toml: {current_version}")
+      - name: Commit version bump
+        run: |
+          VERSION="${{ steps.validate.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          new_version = current_version
-          should_commit = False
-          should_push_commit = False
+          git add pyproject.toml
+          git commit -m "chore: bump version to $VERSION"
 
-          if input_version:
-              # Manual version input
-              if input_version != current_version:
-                  new_version = input_version
-                  should_commit = True
-                  should_push_commit = True
-                  print(f"Using input version: {new_version} (Will update, commit, and push)")
-              else:
-                  print("Input version matches current version. (No file change needed)")
-          else:
-              # No input - Check for existing tag
-              tag = f"v{current_version}"
-              if tag_exists(tag):
-                  # Tag exists, generate timestamp version
-                  timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                  new_version = f"{current_version}-{timestamp}"
-                  should_commit = True
-                  should_push_commit = False # Do not push ephemeral version to main
-                  print(f"Tag {tag} exists. Generated timestamp version: {new_version} (Will commit locally but NOT push to branch)")
-              else:
-                  print(f"Tag {tag} does not exist. Using current version: {current_version} (First release of this version)")
+          echo "Created version bump commit"
 
-          # Configure git
-          subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=True)
-          subprocess.run(["git", "config", "user.email", "github-actions[bot]@users.noreply.github.com"], check=True)
+      - name: Create and push tag
+        run: |
+          VERSION="${{ steps.validate.outputs.version }}"
+          git tag "v$VERSION"
 
-          if should_commit:
-              update_pyproject(new_version)
-              subprocess.run(["git", "add", "pyproject.toml"], check=True)
-              subprocess.run(["git", "commit", "-m", f"Release {new_version}"], check=True)
+          # Push commit and tag
+          git push origin main
+          git push origin "v$VERSION"
 
-              if should_push_commit:
-                   # Pull changes to avoid conflicts before pushing
-                  subprocess.run(["git", "fetch", "origin", ref_name], check=True)
-                  subprocess.run(["git", "pull", "--rebase", "origin", ref_name], check=True)
-                  # Push to specific branch
-                  subprocess.run(["git", "push", "origin", f"HEAD:{ref_name}"], check=True)
-              else:
-                  print("Skipping push of commit (Ephemeral/Timestamp release).")
+          echo "Pushed version bump and tag v$VERSION"
 
-          # Create tag if it doesn't exist
-          tag_name = f"v{new_version}"
-          if not tag_exists(tag_name):
-              print(f"Creating tag {tag_name}")
-              subprocess.run(["git", "tag", tag_name], check=True)
-              subprocess.run(["git", "push", "origin", tag_name], check=True)
-          else:
-             print(f"Tag {tag_name} already exists.")
+      - name: Build package
+        run: |
+          hatch build
 
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
-              fh.write(f"version={new_version}\n")
+          # Verify build artifacts
+          ls -lh dist/
+          twine check dist/*
 
-      - name: Build
-        run: hatch build
-
-      - name: Create Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: Release ${{ steps.version.outputs.version }}
+          tag_name: v${{ steps.validate.outputs.version }}
+          name: Release ${{ steps.validate.outputs.version }}
           files: dist/*
           generate_release_notes: true
+          draft: false
+          prerelease: false
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          if [ -z "$TWINE_PASSWORD" ]; then
+            echo "Warning: PYPI_API_TOKEN secret not set. Skipping PyPI upload."
+            echo "To enable PyPI publishing, add your PyPI API token as a repository secret named PYPI_API_TOKEN"
+          else
+            twine upload dist/*
+            echo "Published to PyPI: https://pypi.org/project/flashforge-python-api/${{ steps.validate.outputs.version }}/"
+          fi
