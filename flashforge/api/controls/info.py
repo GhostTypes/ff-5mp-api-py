@@ -37,9 +37,9 @@ class MachineInfoParser:
 
         try:
             # Helper function to format time from seconds
-            def format_time_from_seconds(seconds: int) -> str:
+            def format_time_from_seconds(seconds: float) -> str:
                 try:
-                    valid_seconds = seconds if isinstance(seconds, int) else 0
+                    valid_seconds = int(seconds) if isinstance(seconds, (int, float)) else 0
                     hours = valid_seconds // 3600
                     minutes = (valid_seconds % 3600) // 60
                     return f"{hours:02d}:{minutes:02d}"

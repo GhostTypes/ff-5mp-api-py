@@ -67,6 +67,14 @@
 
 ## Quick Start
 
+<div align="center">
+
+**Important: LAN-Only Mode Required**
+
+Your printer must be in **LAN-only mode** to communicate with this library. See the [official FlashForge guide](https://wiki.flashforge.com/en/Orca-Flashforge-and-Flashmaker/orca-flashforge-quick-start-guide#connect-via-lan-only-mode) for setup instructions and to obtain your check code.
+
+</div>
+
 ### Printer Discovery
 
 Discover FlashForge printers on your local network automatically:
