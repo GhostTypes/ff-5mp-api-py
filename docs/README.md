@@ -47,7 +47,6 @@
 | **Get Print Progress** | `client.tcp_client.get_print_progress()` | TCP (M27) |
 | **Extract Thumbnail** | `client.tcp_client.get_thumbnail(filename)` | TCP (M662) |
 | **Control LED** | `client.control.set_led_on()` / `set_led_off()` | HTTP (AD5M/5X) |
-| **Control Camera** | `client.control.turn_camera_on()` / `turn_camera_off()` | HTTP (Pro) |
 
 </div>
 
@@ -136,7 +135,7 @@ asyncio.run(main())
 | **Movement** | Home axes (G28) • Move to position (G1) • Relative/absolute positioning |
 | **Print Jobs** | Start print • Pause print • Resume print • Cancel print • Monitor progress |
 | **File Management** | List files on printer • Upload G-code files • Download files • Delete files • Extract thumbnails |
-| **Camera & Lights** | LED control (AD5M/5X) • Camera on/off (Pro models) • Get camera stream URL |
+| **Camera & Lights** | LED control • Get camera stream URL |
 | **Fans & Filtration** | Chamber fan speed • Cooling fan speed • Internal/external filtration control |
 | **Endstops** | Read endstop status (M119) • Monitor limit switches |
 | **Advanced** | Direct G-code execution • Raw TCP commands • Custom HTTP requests |
@@ -151,12 +150,11 @@ asyncio.run(main())
 
 | Printer Model | HTTP Support | TCP Support | Special Features |
 | --- | --- | --- | --- |
-| **Adventurer 5M** | Full | Full | LED, Camera, Basic Filtration |
-| **Adventurer 5M Pro** | Full | Full | LED, Camera, Advanced Filtration |
-| **Adventurer 5X** | Full | Full | LED, Camera, Multi-Material |
-| **Adventurer 3** | Limited | Full | Basic G-code only |
-| **Adventurer 4** | Limited | Full | Basic G-code only |
-| **Other Models** | Varies | Experimental | Generic G-code commands |
+| **AD5X** | Full | Full | LED, Camera, IFS integration |
+| **Adventurer 5M Pro** | Full | Full | LED, Camera, Filtration Control |
+| **Adventurer 5M** | Full | Full | LED, Camera, N/A |
+| **Adventurer 3** | None | Full | Basic G-code only |
+| **Adventurer 4** | Limited | Full | LED, Camera |
 
 </div>
 
