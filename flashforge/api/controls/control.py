@@ -329,7 +329,7 @@ class Control:
         Returns:
             True if the command is successful, False otherwise.
         """
-        return await self.send_control_command(Commands.CIRCULATION_CONTROL_CMD, args.dict())
+        return await self.send_control_command(Commands.CIRCULATION_CONTROL_CMD, args.model_dump())
 
     async def _send_camera_command(self, enabled: bool) -> bool:
         """

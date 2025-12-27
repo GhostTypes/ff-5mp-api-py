@@ -3,7 +3,7 @@ FlashForge Python API - Response Models
 """
 
 from typing import Optional, Union
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from .machine_info import FFPrinterDetail, FFGcodeFileEntry
 
@@ -63,37 +63,36 @@ class FilamentArgs(BaseModel):
 
 class AD5XMaterialMapping(BaseModel):
     """Represents a material mapping for AD5X multi-color printing. Maps a tool (extruder) to a specific material station slot."""
+    model_config = ConfigDict(populate_by_name=True)
+
     tool_id: int = Field(ge=0, le=3, description="Tool ID (0-based: 0, 1, 2, 3)")
     slot_id: int = Field(ge=1, le=4, description="Slot ID (1-based: 1, 2, 3, 4)")
     material_name: str = Field(description="Name of the material (e.g., 'PLA', 'SILK')")
     tool_material_color: str = Field(description="Hex color code for the tool material (e.g., '#FFFFFF')")
     slot_material_color: str = Field(description="Hex color code for the slot material (e.g., '#46328E')")
 
-    class Config:
-        populate_by_name = True
-
 
 class AD5XLocalJobParams(BaseModel):
     """Parameters for starting an AD5X local job with material mappings. Used for multi-color prints that utilize the material station."""
+    model_config = ConfigDict(populate_by_name=True)
+
     file_name: str = Field(description="Name of the file on the printer to start")
     leveling_before_print: bool = Field(description="Whether to perform bed leveling before printing")
     material_mappings: list[AD5XMaterialMapping] = Field(description="Array of material mappings (1-4 items)")
 
-    class Config:
-        populate_by_name = True
-
 
 class AD5XSingleColorJobParams(BaseModel):
     """Parameters for starting an AD5X single-color local job. Used for single-color prints that do not require the material station."""
+    model_config = ConfigDict(populate_by_name=True)
+
     file_name: str = Field(description="Name of the file on the printer to start")
     leveling_before_print: bool = Field(description="Whether to perform bed leveling before printing")
-
-    class Config:
-        populate_by_name = True
 
 
 class AD5XUploadParams(BaseModel):
     """Parameters for uploading a file to AD5X printer with material station support. Extends basic upload functionality with AD5X-specific features."""
+    model_config = ConfigDict(populate_by_name=True)
+
     file_path: str = Field(description="Local file path to upload")
     start_print: bool = Field(description="Whether to start printing immediately after upload")
     leveling_before_print: bool = Field(description="Whether to perform bed leveling before printing")
@@ -102,22 +101,17 @@ class AD5XUploadParams(BaseModel):
     time_lapse_video: bool = Field(description="Whether to enable time lapse video recording")
     material_mappings: list[AD5XMaterialMapping] = Field(description="Array of material mappings for the material station (1-4 items)")
 
-    class Config:
-        populate_by_name = True
-
 
 class GCodeListResponse(GenericResponse):
     """Represents the response structure for a G-code file list request."""
+    model_config = ConfigDict(populate_by_name=True)
+
     gcode_list: Optional[Union[list[str], list[FFGcodeFileEntry]]] = Field(default=None, alias="gcodeList")
     gcode_list_detail: Optional[list[FFGcodeFileEntry]] = Field(default=None, alias="gcodeListDetail")
-
-    class Config:
-        populate_by_name = True
 
 
 class ThumbnailResponse(GenericResponse):
     """Represents the response structure for a G-code thumbnail request."""
-    image_data: str = Field(alias="imageData", description="The thumbnail image data encoded as a base64 string")
+    model_config = ConfigDict(populate_by_name=True)
 
-    class Config:
-        populate_by_name = True
+    image_data: str = Field(alias="imageData", description="The thumbnail image data encoded as a base64 string")

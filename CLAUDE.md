@@ -151,6 +151,47 @@ pre-commit run --all-files
 
 ### Building & Publishing
 
+**IMPORTANT**: Releases are managed through GitHub Actions workflow, not manual PyPI uploads.
+
+#### Release Process (Production)
+
+1. **Prepare the release locally:**
+   ```bash
+   # Update version in pyproject.toml (e.g., 1.0.2 -> 1.0.3)
+   # Update CHANGELOG.md with new version section and changes
+
+   git add pyproject.toml CHANGELOG.md
+   git commit -m "chore: bump version to X.Y.Z"
+   git push
+   ```
+
+2. **Trigger GitHub Actions workflow:**
+   - Go to: https://github.com/GhostTypes/ff-5mp-api-py/actions
+   - Click "Publish Release" workflow
+   - Click "Run workflow" button
+   - Enter version number (e.g., `1.0.3`)
+   - Click green "Run workflow" button
+
+3. **Workflow automatically:**
+   - Validates version format (X.Y.Z)
+   - Verifies version in `pyproject.toml` matches input
+   - Checks tag doesn't already exist
+   - Creates and pushes git tag `vX.Y.Z`
+   - Builds package with Hatchling
+   - Verifies build with `twine check`
+   - Creates GitHub Release with auto-generated changelog
+   - Publishes to PyPI using `PYPI_API_TOKEN` secret
+
+#### PyPI Authentication
+
+Publishing uses GitHub Secrets (not `.pypirc`):
+- **Secret name**: `PYPI_API_TOKEN`
+- **Location**: Repository Settings → Secrets and variables → Actions
+- **Format**: PyPI API token (starts with `pypi-`)
+- **Fallback**: Workflow gracefully skips PyPI upload if secret not configured
+
+#### Manual Building (Development/Testing)
+
 ```bash
 # Clean previous builds
 rm -rf dist/ build/ *.egg-info
@@ -161,23 +202,22 @@ python -m build
 # Check distribution
 twine check dist/*
 
-# Upload to PyPI (credentials from .pypirc)
-python -m twine upload dist/*
+# DO NOT manually upload to PyPI - use workflow instead
 ```
 
 **Version Management**:
-- Current version: **1.0.1** (as of 2025-12-24)
-- Update version in `pyproject.toml` before publishing
+- Current version: **1.0.2** (as of 2025-12-26)
 - Package name: `flashforge-python-api`
 - PyPI: https://pypi.org/project/flashforge-python-api/
-
-### PyPI Publishing Configuration
-
-The project uses `.pypirc` in the root directory for PyPI authentication:
-- File contains PyPI username and API token
-- Git-ignored (never committed)
-- Automatically read by twine during `python -m twine upload dist/*`
 - Build system: Hatchling (defined in `pyproject.toml`)
+
+#### Important Notes
+
+- **Never manually upload to PyPI** - always use the GitHub Actions workflow
+- **Always update CHANGELOG.md** before releasing - workflow doesn't auto-generate it
+- **Version must match** between `pyproject.toml` and workflow input or it will fail
+- **Tags are permanent** - workflow prevents duplicate tags
+- **Linear history required** - workflow creates tags on current HEAD, no version bump commits
 
 ## Testing Strategy
 
@@ -283,9 +323,18 @@ Certain features only work on specific models:
 
 ## Common Gotchas
 
+### Client Usage
 1. **Always call `await client.initialize()`** before using the main FlashForgeClient (sets up HTTP session)
 2. **Model detection** depends on printer name response - early operations may not have full capability info
 3. **TCP keep-alive** runs as background task - call `dispose()` or use context manager to clean up
 4. **Temperature queries** via TCP (`client.tcp_client.get_temp_info()`) return parsed objects, not raw values
 5. **Thumbnail extraction** (M662) can be slow and returns large payloads - use with caution
 6. **File uploads** for AD5X models have different parameters than older models (see `AD5XUploadParams`)
+
+### Release Workflow
+7. **Version bump must be manual** - Workflow does NOT automatically update `pyproject.toml` or `CHANGELOG.md`
+8. **Workflow validates version match** - Input version must exactly match version in `pyproject.toml` or it fails
+9. **No timestamped versions** - Previous workflow created orphaned commits with timestamp versions (e.g., `v1.0.0-20251122005123`) which caused duplicate changelogs. Current workflow uses clean tags only
+10. **Changelog duplication** - If you see duplicate PRs in GitHub release notes, it means there's a tag on an orphaned commit outside the main branch lineage. Delete the orphaned tag to fix
+11. **Linear git history required** - Workflow creates tags on current HEAD without making commits. All version bumps must be committed to `main` before running workflow
+12. **PyPI token is required** - Without `PYPI_API_TOKEN` secret, workflow completes but skips PyPI upload

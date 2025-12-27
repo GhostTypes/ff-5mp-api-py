@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class MachineState(Enum):
@@ -33,17 +33,18 @@ class Temperature(BaseModel):
 
 class SlotInfo(BaseModel):
     """Information about a single slot in the material station."""
+    model_config = ConfigDict(populate_by_name=True)
+
     has_filament: bool = Field(alias="hasFilament", description="Indicates if filament is present in this slot")
     material_color: str = Field(alias="materialColor", description="Color of the material in this slot (e.g., '#FFFFFF')")
     material_name: str = Field(alias="materialName", description="Name of the material in this slot (e.g., 'PLA')")
     slot_id: int = Field(alias="slotId", description="Identifier for this slot")
 
-    class Config:
-        populate_by_name = True
-
 
 class MatlStationInfo(BaseModel):
     """Detailed information about the material station."""
+    model_config = ConfigDict(populate_by_name=True)
+
     current_load_slot: int = Field(alias="currentLoadSlot", description="Currently loading slot ID (0 if none)")
     current_slot: int = Field(alias="currentSlot", description="Currently active/printing slot ID (0 if none)")
     slot_cnt: int = Field(alias="slotCnt", description="Total number of slots in the station")
@@ -51,44 +52,38 @@ class MatlStationInfo(BaseModel):
     state_action: int = Field(alias="stateAction", description="Current action state of the material station")
     state_step: int = Field(alias="stateStep", description="Current step within the state action")
 
-    class Config:
-        populate_by_name = True
-
 
 class IndepMatlInfo(BaseModel):
     """Information related to independent material loading, often used when a single extruder printer has a material station."""
+    model_config = ConfigDict(populate_by_name=True)
+
     material_color: str = Field(alias="materialColor", description="Color of the material")
     material_name: str = Field(alias="materialName", description="Name of the material (can be '?' if unknown)")
     state_action: int = Field(alias="stateAction", description="Current action state")
     state_step: int = Field(alias="stateStep", description="Current step within the state action")
 
-    class Config:
-        populate_by_name = True
-
 
 class FFGcodeToolData(BaseModel):
     """Represents data for a single tool/material used in a G-code file, typically part of a multi-material print."""
+    model_config = ConfigDict(populate_by_name=True)
+
     filament_weight: float = Field(alias="filamentWeight", description="Calculated filament weight for this tool/material in the print")
     material_color: str = Field(alias="materialColor", description="Material color hex string (e.g., '#FFFF00')")
     material_name: str = Field(alias="materialName", description="Name of the material (e.g., 'PLA')")
     slot_id: int = Field(alias="slotId", description="Slot ID from the material station, if applicable (0 if not or direct)")
     tool_id: int = Field(alias="toolId", description="Tool ID or extruder number")
 
-    class Config:
-        populate_by_name = True
-
 
 class FFGcodeFileEntry(BaseModel):
     """Represents a single G-code file entry as returned by the /gcodeList endpoint, especially for printers like AD5X that provide detailed material info."""
+    model_config = ConfigDict(populate_by_name=True)
+
     gcode_file_name: str = Field(alias="gcodeFileName", description="The name of the G-code file (e.g., 'FISH_PLA.3mf')")
     gcode_tool_cnt: Optional[int] = Field(default=None, alias="gcodeToolCnt", description="Number of tools/materials used in this G-code file")
     gcode_tool_datas: Optional[list[FFGcodeToolData]] = Field(default=None, alias="gcodeToolDatas", description="Array of detailed information for each tool/material")
     printing_time: int = Field(alias="printingTime", description="Estimated printing time in seconds")
     total_filament_weight: Optional[float] = Field(default=None, alias="totalFilamentWeight", description="Total estimated filament weight for the print")
     use_matl_station: Optional[bool] = Field(default=None, alias="useMatlStation", description="Indicates if the G-code file is intended for use with a material station")
-
-    class Config:
-        populate_by_name = True
 
 
 class FFPrinterDetail(BaseModel):
