@@ -4,7 +4,7 @@
 
 **A comprehensive Python library for controlling FlashForge 3D printers**
 
-![PyPI](https://img.shields.io/pypi/v/flashforge-python-api?style=flat&color=3776ab) ![Python](https://img.shields.io/badge/Python-3.8%2B-3776ab?style=flat) ![License](https://img.shields.io/badge/License-MIT-brightgreen?style=flat) ![Status](https://img.shields.io/badge/Status-Stable-brightgreen?style=flat)
+![PyPI](https://img.shields.io/pypi/v/flashforge-python-api?style=flat&color=3776ab) ![Python](https://img.shields.io/badge/Python-3.11%2B-3776ab?style=flat) ![License](https://img.shields.io/badge/License-MIT-brightgreen?style=flat) ![Status](https://img.shields.io/badge/Status-Stable-brightgreen?style=flat)
 
 ![aiohttp](https://img.shields.io/badge/aiohttp-%E2%89%A53.8.0-blue?style=flat) ![pydantic](https://img.shields.io/badge/pydantic-%E2%89%A52.0.0-e92063?style=flat) ![netifaces](https://img.shields.io/badge/netifaces-%E2%89%A50.11.0-orange?style=flat) ![requests](https://img.shields.io/badge/requests-%E2%89%A52.31.0-blue?style=flat) ![pillow](https://img.shields.io/badge/pillow-%E2%89%A510.0.0-yellow?style=flat)
 
