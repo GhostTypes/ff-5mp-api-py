@@ -10,7 +10,7 @@
 
 </div>
 
----
+
 
 <div align="center">
 
@@ -26,7 +26,7 @@
 
 </div>
 
----
+
 
 <div align="center">
 
@@ -51,7 +51,7 @@
 
 </div>
 
----
+
 
 <div align="center">
 
@@ -67,7 +67,7 @@
 
 </div>
 
----
+
 
 ## Basic Example
 
@@ -105,7 +105,7 @@ async def main():
 asyncio.run(main())
 ```
 
----
+
 
 <div align="center">
 
@@ -122,7 +122,7 @@ asyncio.run(main())
 
 </div>
 
----
+
 
 <div align="center">
 
@@ -160,7 +160,7 @@ asyncio.run(main())
 
 </div>
 
----
+
 
 <div align="center">
 
@@ -175,7 +175,7 @@ asyncio.run(main())
 
 </div>
 
----
+
 
 <div align="center">
 
@@ -191,7 +191,7 @@ asyncio.run(main())
 
 </div>
 
----
+
 
 <div align="center">
 
