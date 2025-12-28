@@ -269,7 +269,6 @@ async with FlashForgeClient(ip, serial, check) as client:
 Certain features only work on specific models:
 - **LED control**: Adventurer 5M/5X only (check `client.led_control`)
 - **Filtration**: Adventurer 5M Pro only (check `client.filtration_control`)
-- **Camera**: Detected via model name (check `client.is_ad5x`)
 
 ### Error Handling
 - HTTP errors: Wrapped in aiohttp exceptions
@@ -296,12 +295,12 @@ Certain features only work on specific models:
 ## Supported Hardware
 
 **Full Support** (HTTP + TCP):
+- FlashForge AD5X
 - FlashForge Adventurer 5M / 5M Pro
-- FlashForge Adventurer 5X
+- FlashForge Adventurer 4
 
 **Partial Support** (TCP only):
-- FlashForge Adventurer 3 / 4
-- Other networked FlashForge printers (experimental)
+- FlashForge Adventurer 3
 
 ## Dependencies
 
