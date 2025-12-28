@@ -36,15 +36,13 @@
 
 <div align="center">
 
-## Supported Printers
+## Printer Testing & Coverage
 
-| Model | Support Level | Protocols | Features |
+| Printer Model | Support Status | Testing Status | API Type |
 | --- | --- | --- | --- |
-| **FlashForge Adventurer 5M** | Full Support | HTTP + TCP | All features including LED, camera, filtration |
-| **FlashForge Adventurer 5M Pro** | Full Support | HTTP + TCP | All features including advanced filtration control |
-| **FlashForge Adventurer 5X** | Full Support | HTTP + TCP | All features with multi-material support |
-| **FlashForge Adventurer 3 / 4** | Partial Support | TCP Only | Basic control, temperature, movement, status |
-| **Other (Network-enabled)** | Experimental | TCP Only | Generic G-code commands, may vary by model |
+| **AD5X** | Full | Tested | HTTP (New) + TCP |
+| **Adventurer 5M/Pro** | Full | Tested | HTTP (New) + TCP |
+| **Adventurer 3/4** | Partial | Partial | TCP (Legacy) |
 
 </div>
 
