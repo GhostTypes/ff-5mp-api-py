@@ -276,26 +276,26 @@ class FlashForgePrinterDiscovery:
         # Hex dump
         print("Hex dump:")
         for i in range(0, len(response), 16):
-            line = f"{i:04x}   "
+            parts = [f"{i:04x}   "]
 
             # Hex values
             for j in range(16):
                 if i + j < len(response):
-                    line += f"{response[i + j]:02x} "
+                    parts.append(f"{response[i + j]:02x} ")
                 else:
-                    line += "   "
+                    parts.append("   ")
 
                 if j == 7:
-                    line += " "
+                    parts.append(" ")
 
             # ASCII representation
-            line += "  "
+            parts.append("  ")
             for j in range(16):
                 if i + j < len(response):
                     c = response[i + j]
-                    line += chr(c) if 32 <= c <= 126 else '.'
+                    parts.append(chr(c) if 32 <= c <= 126 else '.')
 
-            print(line)
+            print("".join(parts))
 
         # ASCII dump
         print("ASCII dump:")
