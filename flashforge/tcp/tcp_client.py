@@ -56,9 +56,6 @@ class FlashForgeTcpClient:
         self._keep_alive_errors = 0
         """Counter for consecutive keep-alive errors."""
 
-        self._socket_busy = False
-        """Flag indicating if the socket is currently busy sending a command and awaiting a response."""
-
         self._socket_lock = asyncio.Lock()
         """Lock to ensure only one command is sent at a time."""
 
@@ -130,15 +127,6 @@ class FlashForgeTcpClient:
 
         logger.info("Keep-alive stopped.")
 
-    async def is_socket_busy(self) -> bool:
-        """
-        Check if the socket is currently busy processing a command.
-        
-        Returns:
-            True if the socket is busy, False otherwise
-        """
-        return self._socket_busy
-
     async def send_command_async(self, cmd: str) -> Optional[str]:
         """
         Send a command string to the printer asynchronously via the TCP socket.
@@ -155,8 +143,6 @@ class FlashForgeTcpClient:
             the reply is invalid, or the connection needs to be reset
         """
         async with self._socket_lock:
-            self._socket_busy = True
-
             logger.debug(f"sendCommand: {cmd}")
             try:
                 await self._check_socket()
@@ -180,26 +166,6 @@ class FlashForgeTcpClient:
             except Exception as error:
                 logger.error(f"Error while sending command: {error}")
                 return None
-            finally:
-                self._socket_busy = False
-
-    async def _wait_until_socket_available(self) -> None:
-        """
-        Wait until the socket is no longer busy or a timeout is reached.
-        
-        This is used to serialize commands sent over the socket.
-        
-        Raises:
-            TimeoutError: If the socket remains busy for too long (10 seconds)
-        """
-        max_wait_time = 10.0  # 10 seconds
-        start_time = asyncio.get_event_loop().time()
-
-        while self._socket_busy and (asyncio.get_event_loop().time() - start_time < max_wait_time):
-            await asyncio.sleep(0.1)
-
-        if self._socket_busy:
-            raise TimeoutError("Socket remained busy for too long, timing out")
 
     async def _check_socket(self) -> None:
         """
