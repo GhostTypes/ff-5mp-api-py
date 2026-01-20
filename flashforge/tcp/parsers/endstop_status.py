@@ -5,7 +5,10 @@ Parses endstop and machine status information from M119 command responses.
 """
 import re
 from enum import Enum
-from typing import Optional
+from typing import Optional, Dict
+
+# Pre-compiled regex to match key:value pairs where value is an integer
+KV_PATTERN = re.compile(r"([A-Za-z0-9-]+):(\d+)")
 
 
 class MachineStatus(Enum):
@@ -42,27 +45,11 @@ class Status:
         Args:
             data: The string line containing status flags (e.g., "Status S:0 L:0 J:0 F:0")
         """
-        self.s: int = self._get_value(data, "S")
-        self.l: int = self._get_value(data, "L")
-        self.j: int = self._get_value(data, "J")
-        self.f: int = self._get_value(data, "F")
-
-    def _get_value(self, input_str: str, key: str) -> int:
-        """
-        Helper function to extract a numeric value associated with a key from a string.
-        
-        Args:
-            input_str: The string to search within
-            key: The key whose numeric value is to be extracted
-            
-        Returns:
-            The parsed integer value, or -1 if the key is not found or parsing fails
-        """
-        pattern = rf"{key}:(\d+)"
-        match = re.search(pattern, input_str)
-        if match and match.group(1):
-            return int(match.group(1))
-        return -1
+        matches: Dict[str, str] = dict(KV_PATTERN.findall(data))
+        self.s: int = int(matches.get("S", -1))
+        self.l: int = int(matches.get("L", -1))
+        self.j: int = int(matches.get("J", -1))
+        self.f: int = int(matches.get("F", -1))
 
 
 class Endstop:
@@ -79,26 +66,10 @@ class Endstop:
         Args:
             data: The string line containing endstop states (e.g., "Endstop X-max:0 Y-max:0 Z-min:1")
         """
-        self.x_max: int = self._get_value(data, "X-max")
-        self.y_max: int = self._get_value(data, "Y-max")
-        self.z_min: int = self._get_value(data, "Z-min")
-
-    def _get_value(self, input_str: str, key: str) -> int:
-        """
-        Helper function to extract a numeric value associated with a key from a string.
-        
-        Args:
-            input_str: The string to search within
-            key: The key whose numeric value is to be extracted
-            
-        Returns:
-            The parsed integer value, or -1 if the key is not found or parsing fails
-        """
-        pattern = rf"{key}:(\d+)"
-        match = re.search(pattern, input_str)
-        if match and match.group(1):
-            return int(match.group(1))
-        return -1
+        matches: Dict[str, str] = dict(KV_PATTERN.findall(data))
+        self.x_max: int = int(matches.get("X-max", -1))
+        self.y_max: int = int(matches.get("Y-max", -1))
+        self.z_min: int = int(matches.get("Z-min", -1))
 
 
 class EndstopStatus:
