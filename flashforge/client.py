@@ -47,7 +47,8 @@ class FlashForgeClient:
 
         # HTTP client state
         self._http_session: Optional[aiohttp.ClientSession] = None
-        self._http_client_busy = False
+        self._http_client_event = asyncio.Event()
+        self._http_client_event.set()  # Not busy initially
 
         # TCP client setup
         self.tcp_client = TcpClient(ip_address)
@@ -123,17 +124,35 @@ class FlashForgeClient:
         print("Failed to connect to printer")
         return False
 
+    @property
+    def _http_client_busy(self) -> bool:
+        """
+        Legacy property to maintain internal API compatibility.
+        Returns True if the client is busy (event is not set), False otherwise.
+        """
+        return not self._http_client_event.is_set()
+
+    @_http_client_busy.setter
+    def _http_client_busy(self, value: bool) -> None:
+        """
+        Sets the busy state using the event.
+        True means busy (clear event), False means not busy (set event).
+        """
+        if value:
+            self._http_client_event.clear()
+        else:
+            self._http_client_event.set()
+
     async def is_http_client_busy(self) -> bool:
         """
         Checks if the HTTP client is currently busy.
+        Waits until the client is not busy before returning.
         
         Returns:
-            True if the HTTP client is busy, False otherwise
+            False (always returns False after waiting, for compatibility)
         """
-        # Wait a bit if busy to prevent tight loops
-        while self._http_client_busy:
-            await asyncio.sleep(0.01)
-        return self._http_client_busy
+        await self._http_client_event.wait()
+        return False
 
     def release_http_client(self) -> None:
         """Releases the HTTP client, allowing it to be used for new requests."""
