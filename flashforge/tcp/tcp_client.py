@@ -7,11 +7,15 @@ sending raw commands, handling responses, and maintaining keep-alive connections
 
 import asyncio
 import logging
+import re
 from typing import List, Optional
 
 from .gcode.gcodes import GCodes
 
 logger = logging.getLogger(__name__)
+
+# Regex for invalid characters in filenames
+INVALID_FILENAME_CHARS_PATTERN = re.compile(r'[^\w\s\-\.\(\)\+%,@\[\]{}:;!#$^&*=<>?\/]')
 
 
 class FlashForgeTcpClient:
@@ -382,8 +386,7 @@ class FlashForgeTcpClient:
                     filename = full_path[6:]  # Remove '/data/' prefix
 
                     # Trim at the first invalid character (if any)
-                    import re
-                    match = re.search(r'[^\w\s\-\.\(\)\+%,@\[\]{}:;!#$^&*=<>?\/]', filename)
+                    match = INVALID_FILENAME_CHARS_PATTERN.search(filename)
                     if match:
                         filename = filename[:match.start()]
 
