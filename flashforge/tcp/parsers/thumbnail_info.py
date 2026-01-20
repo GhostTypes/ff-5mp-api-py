@@ -3,6 +3,7 @@ FlashForge Python API - Thumbnail Info Parser
 
 Handles the parsing, storage, and manipulation of 3D print file thumbnail images.
 """
+import asyncio
 import base64
 from pathlib import Path
 from typing import Optional
@@ -119,6 +120,12 @@ class ThumbnailInfo:
         base64_data = base64.b64encode(self._image_data).decode('ascii')
         return f"data:image/png;base64,{base64_data}"
 
+    @staticmethod
+    def _write_file_sync(file_path: str, data: bytes) -> None:
+        """Helper to write bytes to a file synchronously."""
+        with open(file_path, 'wb') as f:
+            f.write(data)
+
     async def save_to_file(self, file_path: Optional[str] = None) -> bool:
         """
         Saves the thumbnail image data to a file.
@@ -149,9 +156,9 @@ class ThumbnailInfo:
                 print("ThumbnailInfo: No file path provided and no filename to generate one from")
                 return False
 
-            # Write the bytes to file
-            with open(file_path, 'wb') as f:
-                f.write(self._image_data)
+            # Write the bytes to file in a separate thread to avoid blocking the event loop
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, self._write_file_sync, file_path, self._image_data)
 
             print(f"ThumbnailInfo: Saved thumbnail to {file_path}")
             return True
