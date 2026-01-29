@@ -133,11 +133,7 @@ PRINTER_INFO_REPLAY = (
 )
 
 PRINTER_INFO_MINIMAL_REPLAY = (
-    "ok M115\n"
-    "Machine Type: Adventurer\n"
-    "Machine Name: Bench\n"
-    "Firmware: V1.0.0\n"
-    "SN: SN123\n"
+    "ok M115\nMachine Type: Adventurer\nMachine Name: Bench\nFirmware: V1.0.0\nSN: SN123\n"
 )
 
 FILE_LIST_TCP_PRO = "/data/[FLASH]/file1.gcode::/data/[FLASH]/file2.gcode"

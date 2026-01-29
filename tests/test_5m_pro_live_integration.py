@@ -4,6 +4,7 @@ Live integration tests for the FlashForge Adventurer 5M Pro printer.
 These tests verify connectivity and core functionality against real hardware.
 They are skipped when SKIP_LIVE_TESTS=True in tests/printer_config.py.
 """
+
 import pytest
 
 from flashforge import FlashForgeClient
@@ -19,7 +20,9 @@ class Test5MProLiveIntegration:
         """Connect to 5M Pro and verify status information."""
         config = get_5m_pro_config()
 
-        async with FlashForgeClient(config["ip"], config["serial_number"], config["check_code"]) as client:
+        async with FlashForgeClient(
+            config["ip"], config["serial_number"], config["check_code"]
+        ) as client:
             assert await client.initialize(), "Failed to initialize client"
             assert client.printer_name == config["name"]
             assert client.is_ad5x is False
@@ -33,7 +36,9 @@ class Test5MProLiveIntegration:
         """Validate file list parsing for non-AD5X printers."""
         config = get_5m_pro_config()
 
-        async with FlashForgeClient(config["ip"], config["serial_number"], config["check_code"]) as client:
+        async with FlashForgeClient(
+            config["ip"], config["serial_number"], config["check_code"]
+        ) as client:
             assert await client.initialize()
 
             files = await client.files.get_recent_file_list()
@@ -48,7 +53,9 @@ class Test5MProLiveIntegration:
         """Ensure LED control commands execute without error."""
         config = get_5m_pro_config()
 
-        async with FlashForgeClient(config["ip"], config["serial_number"], config["check_code"]) as client:
+        async with FlashForgeClient(
+            config["ip"], config["serial_number"], config["check_code"]
+        ) as client:
             assert await client.initialize()
 
             # Toggle LEDs; ignore return value but ensure calls do not raise.
@@ -59,7 +66,9 @@ class Test5MProLiveIntegration:
         """Verify filtration control commands execute successfully."""
         config = get_5m_pro_config()
 
-        async with FlashForgeClient(config["ip"], config["serial_number"], config["check_code"]) as client:
+        async with FlashForgeClient(
+            config["ip"], config["serial_number"], config["check_code"]
+        ) as client:
             assert await client.initialize()
 
             await client.control.set_external_filtration_on()
@@ -69,7 +78,9 @@ class Test5MProLiveIntegration:
         """Ensure job control responds gracefully when printer is idle."""
         config = get_5m_pro_config()
 
-        async with FlashForgeClient(config["ip"], config["serial_number"], config["check_code"]) as client:
+        async with FlashForgeClient(
+            config["ip"], config["serial_number"], config["check_code"]
+        ) as client:
             assert await client.initialize()
 
             info = await client.info.get()

@@ -12,7 +12,7 @@ from typing import Final
 class GCodes:
     """
     Collection of G-code and M-code command strings for FlashForge 3D printers.
-    
+
     All commands use the FlashForge TCP protocol with '~' prefix.
     """
 

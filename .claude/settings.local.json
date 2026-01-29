@@ -9,7 +9,11 @@
       "Bash(find:*)",
       "Skill(readme-generator)",
       "Bash(git tag:*)",
-      "Bash(pytest:*)"
+      "Bash(pytest:*)",
+      "Bash(robocopy:*)",
+      "Bash(mypy:*)",
+      "Bash(ruff check:*)",
+      "Bash(ruff format:*)"
     ],
     "deny": [],
     "ask": []

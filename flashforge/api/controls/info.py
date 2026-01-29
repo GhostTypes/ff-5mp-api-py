@@ -1,12 +1,13 @@
 """
 FlashForge Python API - Info Module
 """
-from typing import TYPE_CHECKING, Optional
+
+from typing import TYPE_CHECKING
 
 import aiohttp
 
-from ...models.machine_info import FFMachineInfo, MachineState
-from ...models.responses import DetailResponse
+from ...models.machine_info import FFMachineInfo, MachineState, Temperature
+from ...models.responses import DetailResponse, FFPrinterDetail
 from ..constants.endpoints import Endpoints
 
 if TYPE_CHECKING:
@@ -21,13 +22,13 @@ class MachineInfoParser:
     """
 
     @staticmethod
-    def from_detail(detail) -> Optional[FFMachineInfo]:
+    def from_detail(detail: FFPrinterDetail | None) -> FFMachineInfo | None:
         """
         Converts printer details from the API response format to our internal FFMachineInfo model.
-        
+
         Args:
             detail: The FFPrinterDetail object received from the printer's API.
-            
+
         Returns:
             An FFMachineInfo object containing structured and formatted printer information,
             or None if the input detail is None or an error occurs during processing.
@@ -96,43 +97,33 @@ class MachineInfoParser:
                 # Auto-shutdown settings
                 auto_shutdown=auto_shutdown,
                 auto_shutdown_time=getattr(detail, "auto_shutdown_time", 0) or 0,
-
                 # Camera
                 camera_stream_url=getattr(detail, "camera_stream_url", "") or "",
-
                 # Fan speeds
                 chamber_fan_speed=getattr(detail, "chamber_fan_speed", 0) or 0,
                 cooling_fan_speed=getattr(detail, "cooling_fan_speed", 0) or 0,
                 cooling_fan_left_speed=getattr(detail, "cooling_fan_left_speed", None),
-
                 # Cumulative stats
                 cumulative_filament=getattr(detail, "cumulative_filament", 0) or 0,
                 cumulative_print_time=getattr(detail, "cumulative_print_time", 0) or 0,
-
                 # Current print speed
                 current_print_speed=getattr(detail, "current_print_speed", 0) or 0,
-
                 # Disk space
                 free_disk_space=f"{(getattr(detail, 'remaining_disk_space', 0) or 0):.2f}",
-
                 # Door and error status
                 door_open=door_open,
                 error_code=getattr(detail, "error_code", "") or "",
-
                 # Current print estimates
                 est_length=est_length,
                 est_weight=est_weight,
                 estimated_time=getattr(detail, "estimated_time", 0) or 0,
-
                 # Fans & LED status
                 external_fan_on=external_fan_on,
                 internal_fan_on=internal_fan_on,
                 lights_on=lights_on,
-
                 # Network
                 ip_address=getattr(detail, "ip_addr", "") or "",
                 mac_address=getattr(detail, "mac_addr", "") or "",
-
                 # Print settings
                 fill_amount=getattr(detail, "fill_amount", 0) or 0,
                 firmware_version=getattr(detail, "firmware_version", "") or "",
@@ -140,17 +131,15 @@ class MachineInfoParser:
                 is_pro="Pro" in (getattr(detail, "name", "") or ""),
                 is_ad5x="AD5X" in (getattr(detail, "name", "") or "").upper(),
                 nozzle_size=getattr(detail, "nozzle_model", "") or "",
-
                 # Temperatures
-                print_bed={
-                    "current": getattr(detail, "plat_temp", 0) or 0,
-                    "set": getattr(detail, "plat_target_temp", 0) or 0
-                },
-                extruder={
-                    "current": getattr(detail, "right_temp", 0) or 0,
-                    "set": getattr(detail, "right_target_temp", 0) or 0
-                },
-
+                print_bed=Temperature(
+                    current=getattr(detail, "plat_temp", 0) or 0,
+                    set=getattr(detail, "plat_target_temp", 0) or 0,
+                ),
+                extruder=Temperature(
+                    current=getattr(detail, "right_temp", 0) or 0,
+                    set=getattr(detail, "right_target_temp", 0) or 0,
+                ),
                 # Current print stats
                 print_duration=getattr(detail, "print_duration", 0) or 0,
                 print_file_name=getattr(detail, "print_file_name", "") or "",
@@ -160,23 +149,19 @@ class MachineInfoParser:
                 print_progress_int=int(print_progress * 100),
                 print_speed_adjust=getattr(detail, "print_speed_adjust", 0) or 0,
                 filament_type=getattr(detail, "right_filament_type", "") or "",
-
                 # Machine state
                 machine_state=get_machine_state(getattr(detail, "status", "") or ""),
                 status=getattr(detail, "status", "") or "",
                 total_print_layers=getattr(detail, "target_print_layer", 0) or 0,
                 tvoc=getattr(detail, "tvoc", 0) or 0,
                 z_axis_compensation=getattr(detail, "z_axis_compensation", 0) or 0,
-
                 # Cloud codes
                 flash_cloud_register_code=getattr(detail, "flash_register_code", "") or "",
                 polar_cloud_register_code=getattr(detail, "polar_register_code", "") or "",
-
                 # Extras
                 print_eta=print_eta,
                 formatted_run_time=formatted_run_time,
                 formatted_total_run_time=formatted_total_run_time,
-
                 # AD5X Material Station
                 has_matl_station=getattr(detail, "has_matl_station", None),
                 matl_station_info=getattr(detail, "matl_station_info", None),
@@ -200,17 +185,17 @@ class Info:
     def __init__(self, client: "FlashForgeClient"):
         """
         Creates an instance of the Info class.
-        
+
         Args:
             client: The FlashForgeClient instance used for communication with the printer.
         """
         self.client = client
 
-    async def get(self) -> Optional[FFMachineInfo]:
+    async def get(self) -> FFMachineInfo | None:
         """
         Retrieves comprehensive machine information, processed into the FFMachineInfo model.
         This method fetches detailed data from the printer and transforms it.
-        
+
         Returns:
             An FFMachineInfo object, or None if an error occurs or no data is returned.
         """
@@ -222,53 +207,50 @@ class Info:
     async def is_printing(self) -> bool:
         """
         Checks if the printer is currently in the "printing" state.
-        
+
         Returns:
             True if the printer is printing, False otherwise or if status cannot be determined.
         """
         info = await self.get()
         return info.status == "printing" if info else False
 
-    async def get_status(self) -> Optional[str]:
+    async def get_status(self) -> str | None:
         """
         Retrieves the raw status string of the printer (e.g., "ready", "printing", "error").
-        
+
         Returns:
             The status string, or None if it cannot be determined.
         """
         info = await self.get()
         return info.status if info else None
 
-    async def get_machine_state(self) -> Optional[MachineState]:
+    async def get_machine_state(self) -> MachineState | None:
         """
         Retrieves the machine state as a MachineState enum value.
-        
+
         Returns:
             A MachineState enum value, or None if it cannot be determined.
         """
         info = await self.get()
         return info.machine_state if info else None
 
-    async def get_detail_response(self) -> Optional[DetailResponse]:
+    async def get_detail_response(self) -> DetailResponse | None:
         """
         Retrieves the raw detailed response from the printer's detail endpoint.
         This contains a wealth of information about the printer's current state.
-        
+
         Returns:
             A DetailResponse object containing the raw printer details,
             or None if the request fails or an error occurs.
         """
-        payload = {
-            "serialNumber": self.client.serial_number,
-            "checkCode": self.client.check_code
-        }
+        payload = {"serialNumber": self.client.serial_number, "checkCode": self.client.check_code}
 
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     self.client.get_endpoint(Endpoints.DETAIL),
                     json=payload,
-                    headers={"Content-Type": "application/json"}
+                    headers={"Content-Type": "application/json"},
                 ) as response:
                     if response.status != 200:
                         print(f"Non-200 status from detail endpoint: {response.status}")
@@ -283,8 +265,9 @@ class Info:
                         # Fallback: manually parse as JSON if Content-Type is malformed
                         text = await response.text()
                         import json
+
                         data = json.loads(text)
-                    
+
                     return DetailResponse(**data)
 
         except Exception as error:

@@ -1,14 +1,14 @@
 """
 Unit tests for temperature control operations.
 """
-import asyncio
+
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from flashforge.client import FlashForgeClient
 from flashforge.api.controls.temp_control import TempControl
+from flashforge.client import FlashForgeClient
 from flashforge.tcp.ff_client import FlashForgeClient as TcpFlashForgeClient
 
 
