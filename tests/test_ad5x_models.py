@@ -14,18 +14,19 @@ These tests validate the AD5X-specific data models including:
 import pytest
 from pydantic import ValidationError
 
-from flashforge.models.responses import (
-    AD5XMaterialMapping,
-    AD5XLocalJobParams,
-    AD5XSingleColorJobParams,
-    AD5XUploadParams,
-)
 from flashforge.models.machine_info import (
     FFGcodeFileEntry,
     FFGcodeToolData,
-    SlotInfo,
-    MatlStationInfo,
     IndepMatlInfo,
+    MatlStationInfo,
+    SlotInfo,
+)
+from flashforge.models.responses import (
+    AD5XLocalJobParams,
+    AD5XMaterialMapping,
+    AD5XSingleColorJobParams,
+    AD5XUploadParams,
+    FilamentArgs,
 )
 
 
@@ -39,7 +40,7 @@ class TestAD5XMaterialMapping:
             slot_id=1,
             material_name="PLA",
             tool_material_color="#FFFFFF",
-            slot_material_color="#000000"
+            slot_material_color="#000000",
         )
 
         assert mapping.tool_id == 0
@@ -56,7 +57,7 @@ class TestAD5XMaterialMapping:
                 slot_id=1,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
             assert mapping.tool_id == tool_id
 
@@ -68,7 +69,7 @@ class TestAD5XMaterialMapping:
                 slot_id=slot_id,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
             assert mapping.slot_id == slot_id
 
@@ -80,7 +81,7 @@ class TestAD5XMaterialMapping:
                 slot_id=1,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
 
     def test_rejects_invalid_tool_id_too_high(self):
@@ -91,7 +92,7 @@ class TestAD5XMaterialMapping:
                 slot_id=1,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
 
     def test_rejects_invalid_slot_id_zero(self):
@@ -102,7 +103,7 @@ class TestAD5XMaterialMapping:
                 slot_id=0,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
 
     def test_rejects_invalid_slot_id_too_high(self):
@@ -113,7 +114,7 @@ class TestAD5XMaterialMapping:
                 slot_id=5,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
 
 
@@ -127,13 +128,11 @@ class TestAD5XLocalJobParams:
             slot_id=1,
             material_name="PLA",
             tool_material_color="#FFFFFF",
-            slot_material_color="#000000"
+            slot_material_color="#000000",
         )
 
         params = AD5XLocalJobParams(
-            file_name="test.gcode",
-            leveling_before_print=True,
-            material_mappings=[mapping]
+            file_name="test.gcode", leveling_before_print=True, material_mappings=[mapping]
         )
 
         assert params.file_name == "test.gcode"
@@ -148,15 +147,13 @@ class TestAD5XLocalJobParams:
                 slot_id=i + 1,
                 material_name=f"Material{i}",
                 tool_material_color="#FF0000",
-                slot_material_color="#00FF00"
+                slot_material_color="#00FF00",
             )
             for i in range(3)
         ]
 
         params = AD5XLocalJobParams(
-            file_name="multi.gcode",
-            leveling_before_print=False,
-            material_mappings=mappings
+            file_name="multi.gcode", leveling_before_print=False, material_mappings=mappings
         )
 
         assert len(params.material_mappings) == 3
@@ -168,8 +165,7 @@ class TestAD5XSingleColorJobParams:
     def test_create_valid_params(self):
         """Test creating valid single-color job parameters"""
         params = AD5XSingleColorJobParams(
-            file_name="single_color.gcode",
-            leveling_before_print=True
+            file_name="single_color.gcode", leveling_before_print=True
         )
 
         assert params.file_name == "single_color.gcode"
@@ -177,10 +173,7 @@ class TestAD5XSingleColorJobParams:
 
     def test_create_without_leveling(self):
         """Test creating params without bed leveling"""
-        params = AD5XSingleColorJobParams(
-            file_name="test.gcode",
-            leveling_before_print=False
-        )
+        params = AD5XSingleColorJobParams(file_name="test.gcode", leveling_before_print=False)
 
         assert params.leveling_before_print is False
 
@@ -195,7 +188,7 @@ class TestAD5XUploadParams:
             slot_id=1,
             material_name="PLA",
             tool_material_color="#FFFFFF",
-            slot_material_color="#000000"
+            slot_material_color="#000000",
         )
 
         params = AD5XUploadParams(
@@ -205,7 +198,7 @@ class TestAD5XUploadParams:
             flow_calibration=False,
             first_layer_inspection=True,
             time_lapse_video=False,
-            material_mappings=[mapping]
+            material_mappings=[mapping],
         )
 
         assert params.file_path == "/path/to/file.gcode"
@@ -223,7 +216,7 @@ class TestAD5XUploadParams:
             slot_id=1,
             material_name="PLA",
             tool_material_color="#FFFFFF",
-            slot_material_color="#000000"
+            slot_material_color="#000000",
         )
 
         params = AD5XUploadParams(
@@ -233,16 +226,18 @@ class TestAD5XUploadParams:
             flow_calibration=True,
             first_layer_inspection=True,
             time_lapse_video=True,
-            material_mappings=[mapping]
+            material_mappings=[mapping],
         )
 
-        assert all([
-            params.start_print,
-            params.leveling_before_print,
-            params.flow_calibration,
-            params.first_layer_inspection,
-            params.time_lapse_video
-        ])
+        assert all(
+            [
+                params.start_print,
+                params.leveling_before_print,
+                params.flow_calibration,
+                params.first_layer_inspection,
+                params.time_lapse_video,
+            ]
+        )
 
 
 class TestFFGcodeFileEntry:
@@ -250,10 +245,7 @@ class TestFFGcodeFileEntry:
 
     def test_create_basic_entry(self):
         """Test creating basic file entry (older printer format)"""
-        entry = FFGcodeFileEntry(
-            gcode_file_name="test.gcode",
-            printing_time=3600
-        )
+        entry = FFGcodeFileEntry(gcode_file_name="test.gcode", printing_time=3600)
 
         assert entry.gcode_file_name == "test.gcode"
         assert entry.printing_time == 3600
@@ -267,7 +259,7 @@ class TestFFGcodeFileEntry:
             material_color="#FF0000",
             material_name="PLA",
             slot_id=1,
-            tool_id=0
+            tool_id=0,
         )
 
         entry = FFGcodeFileEntry(
@@ -276,7 +268,7 @@ class TestFFGcodeFileEntry:
             gcode_tool_cnt=2,
             gcode_tool_datas=[tool_data],
             total_filament_weight=100.5,
-            use_matl_station=True
+            use_matl_station=True,
         )
 
         assert entry.gcode_file_name == "multi_color.3mf"
@@ -293,7 +285,7 @@ class TestFFGcodeFileEntry:
             "printingTime": 1800,
             "gcodeToolCnt": 1,
             "totalFilamentWeight": 25.0,
-            "useMatlStation": False
+            "useMatlStation": False,
         }
 
         entry = FFGcodeFileEntry(**data)
@@ -315,7 +307,7 @@ class TestFFGcodeToolData:
             material_color="#FF0000",
             material_name="PLA",
             slot_id=2,
-            tool_id=1
+            tool_id=1,
         )
 
         assert tool_data.filament_weight == 25.5
@@ -331,7 +323,7 @@ class TestFFGcodeToolData:
             "materialColor": "#00FF00",
             "materialName": "PETG",
             "slotId": 3,
-            "toolId": 2
+            "toolId": 2,
         }
 
         tool_data = FFGcodeToolData(**data)
@@ -348,12 +340,7 @@ class TestSlotInfo:
 
     def test_create_slot_info(self):
         """Test creating slot info"""
-        slot = SlotInfo(
-            has_filament=True,
-            material_color="#FF0000",
-            material_name="PLA",
-            slot_id=1
-        )
+        slot = SlotInfo(has_filament=True, material_color="#FF0000", material_name="PLA", slot_id=1)
 
         assert slot.has_filament is True
         assert slot.material_color == "#FF0000"
@@ -362,12 +349,7 @@ class TestSlotInfo:
 
     def test_create_empty_slot(self):
         """Test creating empty slot info"""
-        slot = SlotInfo(
-            has_filament=False,
-            material_color="",
-            material_name="",
-            slot_id=2
-        )
+        slot = SlotInfo(has_filament=False, material_color="", material_name="", slot_id=2)
 
         assert slot.has_filament is False
         assert slot.material_color == ""
@@ -381,10 +363,7 @@ class TestMatlStationInfo:
         """Test creating material station info"""
         slots = [
             SlotInfo(
-                has_filament=True,
-                material_color="#FF0000",
-                material_name="PLA",
-                slot_id=i + 1
+                has_filament=True, material_color="#FF0000", material_name="PLA", slot_id=i + 1
             )
             for i in range(4)
         ]
@@ -395,7 +374,7 @@ class TestMatlStationInfo:
             slot_cnt=4,
             slot_infos=slots,
             state_action=0,
-            state_step=0
+            state_step=0,
         )
 
         assert station.current_load_slot == 0
@@ -412,10 +391,7 @@ class TestIndepMatlInfo:
     def test_create_indep_matl_info(self):
         """Test creating independent material info"""
         info = IndepMatlInfo(
-            material_color="#00FF00",
-            material_name="PETG",
-            state_action=1,
-            state_step=2
+            material_color="#00FF00", material_name="PETG", state_action=1, state_step=2
         )
 
         assert info.material_color == "#00FF00"
@@ -425,11 +401,43 @@ class TestIndepMatlInfo:
 
     def test_create_with_unknown_material(self):
         """Test creating info with unknown material"""
-        info = IndepMatlInfo(
-            material_color="",
-            material_name="?",
-            state_action=0,
-            state_step=0
-        )
+        info = IndepMatlInfo(material_color="", material_name="?", state_action=0, state_step=0)
 
         assert info.material_name == "?"
+
+
+class TestFilamentArgs:
+    """Tests for FilamentArgs model"""
+
+    def test_create_with_factory_method_both_open(self):
+        """Test creating FilamentArgs with both filters open"""
+        args = FilamentArgs.create(internal_on=True, external_on=True)
+
+        assert args.internal == "open"
+        assert args.external == "open"
+
+    def test_create_with_factory_method_both_closed(self):
+        """Test creating FilamentArgs with both filters closed"""
+        args = FilamentArgs.create(internal_on=False, external_on=False)
+
+        assert args.internal == "close"
+        assert args.external == "close"
+
+    def test_create_with_factory_method_mixed(self):
+        """Test creating FilamentArgs with mixed states"""
+        args = FilamentArgs.create(internal_on=True, external_on=False)
+
+        assert args.internal == "open"
+        assert args.external == "close"
+
+    def test_rejects_invalid_states_via_constructor(self):
+        """Test that invalid states are rejected if passed directly to constructor"""
+        with pytest.raises(ValueError):
+            FilamentArgs(internal="invalid", external="open")
+
+    def test_model_validation_passes(self):
+        """Test that model validation works correctly"""
+        args = FilamentArgs(internal="open", external="close")
+
+        assert args.internal == "open"
+        assert args.external == "close"

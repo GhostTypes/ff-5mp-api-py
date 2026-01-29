@@ -1,6 +1,7 @@
 """
 Tests for FlashForge printer discovery functionality.
 """
+
 import asyncio
 import socket
 import sys
@@ -13,8 +14,8 @@ import pytest
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from flashforge.discovery import FlashForgePrinter, FlashForgePrinterDiscovery
-from flashforge.discovery.discovery import DiscoveryProtocol
+from flashforge.discovery import FlashForgePrinter, FlashForgePrinterDiscovery  # noqa: E402
+from flashforge.discovery.discovery import DiscoveryProtocol  # noqa: E402
 
 
 class TestFlashForgePrinter:
@@ -30,9 +31,7 @@ class TestFlashForgePrinter:
     def test_create_printer_with_data(self):
         """Test creating a printer with initial data."""
         printer = FlashForgePrinter(
-            name="Adventurer 5M Pro",
-            serial_number="ABC123456",
-            ip_address="192.168.1.100"
+            name="Adventurer 5M Pro", serial_number="ABC123456", ip_address="192.168.1.100"
         )
         assert printer.name == "Adventurer 5M Pro"
         assert printer.serial_number == "ABC123456"
@@ -41,20 +40,14 @@ class TestFlashForgePrinter:
     def test_printer_string_representation(self):
         """Test string representation of printer."""
         printer = FlashForgePrinter(
-            name="Test Printer",
-            serial_number="TEST123",
-            ip_address="192.168.1.50"
+            name="Test Printer", serial_number="TEST123", ip_address="192.168.1.50"
         )
         expected = "Name: Test Printer, Serial: TEST123, IP: 192.168.1.50"
         assert str(printer) == expected
 
     def test_printer_repr(self):
         """Test repr representation of printer."""
-        printer = FlashForgePrinter(
-            name="Test",
-            serial_number="123",
-            ip_address="192.168.1.1"
-        )
+        printer = FlashForgePrinter(name="Test", serial_number="123", ip_address="192.168.1.1")
         repr_str = repr(printer)
         assert "FlashForgePrinter" in repr_str
         assert "name='Test'" in repr_str
@@ -71,16 +64,35 @@ class TestFlashForgePrinterDiscovery:
         assert discovery.discovery_port == 48899
         assert discovery.listen_port == 18007
         assert len(discovery.discovery_message) == 20
-        assert discovery.discovery_message[:7] == b'www.usr'
+        assert discovery.discovery_message[:7] == b"www.usr"
 
     def test_discovery_message_format(self):
         """Test that the discovery message has the correct format."""
         discovery = FlashForgePrinterDiscovery()
-        expected = bytes([
-            0x77, 0x77, 0x77, 0x2e, 0x75, 0x73, 0x72, 0x22,  # "www.usr"
-            0x65, 0x36, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00
-        ])
+        expected = bytes(
+            [
+                0x77,
+                0x77,
+                0x77,
+                0x2E,
+                0x75,
+                0x73,
+                0x72,
+                0x22,  # "www.usr"
+                0x65,
+                0x36,
+                0xC0,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+            ]
+        )
         assert discovery.discovery_message == expected
 
     def test_calculate_broadcast_address(self):
@@ -119,7 +131,7 @@ class TestFlashForgePrinterDiscovery:
 
         # Set serial number at offset 0x92 (146 decimal, 32 bytes)
         serial = b"FF123456789\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-        response[0x92:0x92+32] = serial
+        response[0x92 : 0x92 + 32] = serial
 
         printer = discovery._parse_printer_response(bytes(response), "192.168.1.100")
         assert printer is not None
@@ -144,35 +156,40 @@ class TestFlashForgePrinterDiscovery:
         # Should return None since both name and serial are empty
         assert printer is None
 
-    @patch('netifaces.interfaces')
-    @patch('netifaces.ifaddresses')
+    @patch("netifaces.interfaces")
+    @patch("netifaces.ifaddresses")
     def test_get_broadcast_addresses(self, mock_ifaddresses, mock_interfaces):
         """Test getting broadcast addresses from network interfaces."""
         discovery = FlashForgePrinterDiscovery()
 
         # Mock network interfaces
-        mock_interfaces.return_value = ['eth0', 'lo']
+        mock_interfaces.return_value = ["eth0", "lo"]
 
         # Mock interface addresses
         import netifaces
-        mock_ifaddresses.side_effect = lambda iface: {
-            netifaces.AF_INET: [
-                {
-                    'addr': '192.168.1.100' if iface == 'eth0' else '127.0.0.1',
-                    'netmask': '255.255.255.0' if iface == 'eth0' else '255.0.0.0'
-                }
-            ]
-        } if iface in ['eth0', 'lo'] else {}
+
+        mock_ifaddresses.side_effect = (
+            lambda iface: {
+                netifaces.AF_INET: [
+                    {
+                        "addr": "192.168.1.100" if iface == "eth0" else "127.0.0.1",
+                        "netmask": "255.255.255.0" if iface == "eth0" else "255.0.0.0",
+                    }
+                ]
+            }
+            if iface in ["eth0", "lo"]
+            else {}
+        )
 
         addresses = discovery._get_broadcast_addresses()
 
         # Should include calculated broadcast address and fallback
-        assert '192.168.1.255' in addresses
-        assert '255.255.255.255' in addresses
+        assert "192.168.1.255" in addresses
+        assert "255.255.255.255" in addresses
         # Should not include loopback broadcast
-        assert '127.255.255.255' not in addresses
+        assert "127.255.255.255" not in addresses
 
-    @patch('netifaces.interfaces')
+    @patch("netifaces.interfaces")
     def test_get_broadcast_addresses_fallback(self, mock_interfaces):
         """Test broadcast address fallback when netifaces fails."""
         discovery = FlashForgePrinterDiscovery()
@@ -183,7 +200,7 @@ class TestFlashForgePrinterDiscovery:
         addresses = discovery._get_broadcast_addresses()
 
         # Should include fallback addresses
-        expected_fallbacks = ['255.255.255.255', '192.168.1.255', '192.168.0.255']
+        expected_fallbacks = ["255.255.255.255", "192.168.1.255", "192.168.0.255"]
         for addr in expected_fallbacks:
             assert addr in addresses
 
@@ -191,7 +208,7 @@ class TestFlashForgePrinterDiscovery:
         """Test debug info printing."""
         discovery = FlashForgePrinterDiscovery()
 
-        test_data = b"Test data with some bytes: \x01\x02\x03\xFF"
+        test_data = b"Test data with some bytes: \x01\x02\x03\xff"
         discovery.print_debug_info(test_data, "192.168.1.100")
 
         captured = capsys.readouterr()
@@ -213,19 +230,18 @@ class TestFlashForgePrinterDiscovery:
         fake_protocol = AsyncMock()
         fake_protocol.wait_for_responses = AsyncMock(return_value=[])
 
-        with patch.object(
-            discovery,
-            "_get_broadcast_addresses",
-            return_value=[]
-        ), patch.object(
-            loop,
-            "create_datagram_endpoint",
-            AsyncMock(return_value=(fake_transport, fake_protocol))
-        ), patch(
-            "flashforge.discovery.discovery.asyncio.sleep",
-            new=AsyncMock(return_value=None)
+        with (
+            patch.object(discovery, "_get_broadcast_addresses", return_value=[]),
+            patch.object(
+                loop,
+                "create_datagram_endpoint",
+                AsyncMock(return_value=(fake_transport, fake_protocol)),
+            ),
+            patch("flashforge.discovery.discovery.asyncio.sleep", new=AsyncMock(return_value=None)),
         ):
-            printers = await discovery.discover_printers_async(timeout_ms=5, idle_timeout_ms=5, max_retries=1)
+            printers = await discovery.discover_printers_async(
+                timeout_ms=5, idle_timeout_ms=5, max_retries=1
+            )
 
         assert printers == []
 
@@ -249,19 +265,18 @@ class TestFlashForgePrinterDiscovery:
         fake_protocol = AsyncMock()
         fake_protocol.wait_for_responses = AsyncMock(return_value=[])
 
-        with patch.object(
-            discovery,
-            "_get_broadcast_addresses",
-            return_value=["192.168.1.255"]
-        ), patch.object(
-            loop,
-            "create_datagram_endpoint",
-            AsyncMock(return_value=(fake_transport, fake_protocol))
-        ), patch(
-            "flashforge.discovery.discovery.asyncio.sleep",
-            new=AsyncMock(return_value=None)
+        with (
+            patch.object(discovery, "_get_broadcast_addresses", return_value=["192.168.1.255"]),
+            patch.object(
+                loop,
+                "create_datagram_endpoint",
+                AsyncMock(return_value=(fake_transport, fake_protocol)),
+            ),
+            patch("flashforge.discovery.discovery.asyncio.sleep", new=AsyncMock(return_value=None)),
         ):
-            printers = await discovery.discover_printers_async(timeout_ms=5, idle_timeout_ms=5, max_retries=1)
+            printers = await discovery.discover_printers_async(
+                timeout_ms=5, idle_timeout_ms=5, max_retries=1
+            )
 
         assert printers == []
 
@@ -288,11 +303,14 @@ class TestDiscoveryIntegration:
         async def mock_wait_for_responses(self, timeout, idle_timeout):
             return []
 
-        with patch('flashforge.discovery.discovery.DiscoveryProtocol.wait_for_responses', new=mock_wait_for_responses):
+        with patch(
+            "flashforge.discovery.discovery.DiscoveryProtocol.wait_for_responses",
+            new=mock_wait_for_responses,
+        ):
             printers = await discovery.discover_printers_async(
                 timeout_ms=100,  # Short timeout for testing
                 idle_timeout_ms=50,
-                max_retries=1
+                max_retries=1,
             )
 
         assert printers == []
@@ -304,9 +322,7 @@ class TestDiscoveryIntegration:
 
         # Create a mock printer response
         mock_printer = FlashForgePrinter(
-            name="Test Printer",
-            serial_number="TEST123",
-            ip_address="192.168.1.100"
+            name="Test Printer", serial_number="TEST123", ip_address="192.168.1.100"
         )
 
         # Mock the transport and protocol
@@ -325,15 +341,13 @@ class TestDiscoveryIntegration:
             return (mock_transport, mock_protocol)
 
         # Patch the event loop's create_datagram_endpoint method
-        with patch('asyncio.get_event_loop') as mock_loop:
+        with patch("asyncio.get_event_loop") as mock_loop:
             loop = asyncio.get_event_loop()
             mock_loop.return_value = loop
 
-            with patch.object(loop, 'create_datagram_endpoint', new=mock_create_datagram_endpoint):
+            with patch.object(loop, "create_datagram_endpoint", new=mock_create_datagram_endpoint):
                 printers = await discovery.discover_printers_async(
-                    timeout_ms=100,
-                    idle_timeout_ms=50,
-                    max_retries=1
+                    timeout_ms=100, idle_timeout_ms=50, max_retries=1
                 )
 
         assert len(printers) == 1
@@ -348,14 +362,12 @@ class TestDiscoveryIntegration:
 
         # Create duplicate printers with same IP
         printer1 = FlashForgePrinter(
-            name="Printer1",
-            serial_number="123",
-            ip_address="192.168.1.100"
+            name="Printer1", serial_number="123", ip_address="192.168.1.100"
         )
         printer2 = FlashForgePrinter(
             name="Printer2",  # Different name
             serial_number="456",  # Different serial
-            ip_address="192.168.1.100"  # Same IP
+            ip_address="192.168.1.100",  # Same IP
         )
 
         duplicates = [printer1, printer2]
@@ -368,30 +380,30 @@ class TestDiscoveryIntegration:
         fake_transport.sendto = Mock()
         fake_transport.close = Mock()
 
-        fake_protocol = Mock()
+        Mock()
 
         async def mock_create_datagram_endpoint(protocol_factory, **kwargs):
             protocol = protocol_factory()
             return fake_transport, protocol
 
-        with patch.object(
-            FlashForgePrinterDiscovery,
-            "_get_broadcast_addresses",
-            return_value=["192.168.1.255"]
-        ), patch(
-            'flashforge.discovery.discovery.asyncio.get_event_loop'
-        ) as mock_get_loop, patch(
-            'flashforge.discovery.discovery.DiscoveryProtocol.wait_for_responses',
-            new=mock_wait_for_responses
+        with (
+            patch.object(
+                FlashForgePrinterDiscovery,
+                "_get_broadcast_addresses",
+                return_value=["192.168.1.255"],
+            ),
+            patch("flashforge.discovery.discovery.asyncio.get_event_loop") as mock_get_loop,
+            patch(
+                "flashforge.discovery.discovery.DiscoveryProtocol.wait_for_responses",
+                new=mock_wait_for_responses,
+            ),
         ):
             loop = Mock()
             loop.create_datagram_endpoint = AsyncMock(side_effect=mock_create_datagram_endpoint)
             mock_get_loop.return_value = loop
 
             printers = await discovery.discover_printers_async(
-                timeout_ms=100,
-                idle_timeout_ms=50,
-                max_retries=1
+                timeout_ms=100, idle_timeout_ms=50, max_retries=1
             )
 
         # Should only have one printer (duplicates removed by IP)
@@ -412,9 +424,7 @@ class TestLiveDiscovery:
         """
         discovery = FlashForgePrinterDiscovery()
         printers = await discovery.discover_printers_async(
-            timeout_ms=10000,
-            idle_timeout_ms=1500,
-            max_retries=3
+            timeout_ms=10000, idle_timeout_ms=1500, max_retries=3
         )
 
         # Print results for visibility
@@ -434,14 +444,14 @@ class TestLiveDiscovery:
             assert printer.name != "" or printer.serial_number != ""
 
 
-@pytest.mark.skipif(not hasattr(socket, 'AF_INET'), reason="Socket operations not available")
+@pytest.mark.skipif(not hasattr(socket, "AF_INET"), reason="Socket operations not available")
 class TestDiscoveryNetwork:
     """Network-level tests for discovery (may require network access)."""
 
     @pytest.mark.asyncio
     async def test_socket_creation(self):
         """Test that sockets can be created and configured properly."""
-        discovery = FlashForgePrinterDiscovery()
+        FlashForgePrinterDiscovery()
 
         # Test discovery socket creation
         with patch("socket.socket") as mock_socket:

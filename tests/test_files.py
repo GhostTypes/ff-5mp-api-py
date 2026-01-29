@@ -1,14 +1,13 @@
 """
 Unit tests for the Files module.
 """
-import asyncio
+
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from flashforge.client import FlashForgeClient
-
 from tests.fixtures.printer_responses import (
     FILE_LIST_5M_PRO_RESPONSE,
     FILE_LIST_AD5X_RESPONSE,
@@ -135,7 +134,7 @@ async def test_get_recent_file_list_network_timeout():
             return False
 
         def post(self, *args, **kwargs):
-            raise asyncio.TimeoutError()
+            raise TimeoutError()
 
     failing_session = FailingSession()
 

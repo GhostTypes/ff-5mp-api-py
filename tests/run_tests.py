@@ -4,6 +4,7 @@ Test runner for FlashForge Python API.
 This module provides a simple way to run all tests for the FlashForge API.
 Supports both uv and traditional Python environments.
 """
+
 import shutil
 import subprocess
 import sys
@@ -13,13 +14,13 @@ from pathlib import Path
 def get_python_runner():
     """
     Determine the best Python runner (uv or direct python).
-    
+
     Returns:
         List of command components to run Python
     """
     # Check if we're in a uv project and uv is available
-    if shutil.which('uv') and (Path.cwd() / 'pyproject.toml').exists():
-        return ['uv', 'run', 'python']
+    if shutil.which("uv") and (Path.cwd() / "pyproject.toml").exists():
+        return ["uv", "run", "python"]
     else:
         return [sys.executable]
 
@@ -27,7 +28,7 @@ def get_python_runner():
 def run_tests(verbose: bool = True, coverage: bool = False):
     """
     Run all tests for the FlashForge Python API.
-    
+
     Args:
         verbose: If True, run tests in verbose mode
         coverage: If True, run tests with coverage reporting
@@ -166,10 +167,10 @@ def show_environment_info():
     subprocess.run(version_cmd, cwd=project_root)
 
     # Show if we're using uv
-    if 'uv' in python_cmd:
+    if "uv" in python_cmd:
         print("[*] Using uv package manager")
-        if shutil.which('uv'):
-            uv_version = subprocess.run(['uv', '--version'], capture_output=True, text=True)
+        if shutil.which("uv"):
+            uv_version = subprocess.run(["uv", "--version"], capture_output=True, text=True)
             if uv_version.returncode == 0:
                 print(f"   {uv_version.stdout.strip()}")
     else:
@@ -179,7 +180,10 @@ def show_environment_info():
     print(f"[*] Project root: {project_root}")
 
     # Try to import flashforge to check installation
-    import_cmd = python_cmd + ["-c", "import flashforge; print('FlashForge API installed successfully')"]
+    import_cmd = python_cmd + [
+        "-c",
+        "import flashforge; print('FlashForge API installed successfully')",
+    ]
     import_result = subprocess.run(import_cmd, cwd=project_root, capture_output=True, text=True)
 
     if import_result.returncode == 0:

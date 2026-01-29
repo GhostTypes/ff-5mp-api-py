@@ -9,13 +9,15 @@ IMPORTANT:
 - These tests require an actual AD5X printer on your network
 - Tests are read-only and will not modify printer state
 """
+
 import pytest
+
 from flashforge import (
-    FlashForgeClient,
     AD5XMaterialMapping,
     Filament,
+    FlashForgeClient,
+    FNetCode,
     format_scientific_notation,
-    FNetCode
 )
 from tests.printer_config import get_test_printer_config, skip_if_no_printer
 
@@ -29,7 +31,9 @@ class TestAD5XLiveConnection:
         """Test connecting to AD5X and retrieving detailed printer information"""
         config = get_test_printer_config()
 
-        async with FlashForgeClient(config["ip"], config["serial_number"], config["check_code"]) as client:
+        async with FlashForgeClient(
+            config["ip"], config["serial_number"], config["check_code"]
+        ) as client:
             assert await client.initialize(), "Failed to initialize client"
 
             # Verify basic connection
@@ -50,14 +54,16 @@ class TestAD5XLiveConnection:
             # Verify temperature objects exist
             assert info.extruder is not None
             assert info.print_bed is not None
-            assert hasattr(info.extruder, 'current')
-            assert hasattr(info.extruder, 'set')
+            assert hasattr(info.extruder, "current")
+            assert hasattr(info.extruder, "set")
 
     async def test_material_station_info(self):
         """Test retrieving material station information"""
         config = get_test_printer_config()
 
-        async with FlashForgeClient(config["ip"], config["serial_number"], config["check_code"]) as client:
+        async with FlashForgeClient(
+            config["ip"], config["serial_number"], config["check_code"]
+        ) as client:
             assert await client.initialize()
 
             info = await client.info.get()
@@ -79,8 +85,10 @@ class TestAD5XLiveConnection:
                     assert slot.material_name is not None
                     assert slot.material_color is not None
                     # Color should be hex format if not empty
-                    if slot.material_color and slot.material_color != '':
-                        assert slot.material_color.startswith('#'), f"Color should be hex format: {slot.material_color}"
+                    if slot.material_color and slot.material_color != "":
+                        assert slot.material_color.startswith("#"), (
+                            f"Color should be hex format: {slot.material_color}"
+                        )
 
 
 @pytest.mark.asyncio
@@ -92,7 +100,9 @@ class TestAD5XFileOperations:
         """Test that recent file list returns structured FFGcodeFileEntry objects"""
         config = get_test_printer_config()
 
-        async with FlashForgeClient(config["ip"], config["serial_number"], config["check_code"]) as client:
+        async with FlashForgeClient(
+            config["ip"], config["serial_number"], config["check_code"]
+        ) as client:
             assert await client.initialize()
 
             recent_files = await client.files.get_recent_file_list()
@@ -103,8 +113,8 @@ class TestAD5XFileOperations:
                 entry = recent_files[0]
 
                 # Verify required fields exist
-                assert hasattr(entry, 'gcode_file_name')
-                assert hasattr(entry, 'printing_time')
+                assert hasattr(entry, "gcode_file_name")
+                assert hasattr(entry, "printing_time")
                 assert entry.gcode_file_name is not None
                 assert entry.printing_time >= 0
 
@@ -124,7 +134,9 @@ class TestAD5XFileOperations:
         """Test retrieving local file list"""
         config = get_test_printer_config()
 
-        async with FlashForgeClient(config["ip"], config["serial_number"], config["check_code"]) as client:
+        async with FlashForgeClient(
+            config["ip"], config["serial_number"], config["check_code"]
+        ) as client:
             assert await client.initialize()
 
             local_files = await client.files.get_local_file_list()
@@ -144,7 +156,9 @@ class TestAD5XJobControl:
         """Test that valid material mappings pass validation"""
         config = get_test_printer_config()
 
-        async with FlashForgeClient(config["ip"], config["serial_number"], config["check_code"]) as client:
+        async with FlashForgeClient(
+            config["ip"], config["serial_number"], config["check_code"]
+        ) as client:
             assert await client.initialize()
 
             # Create a valid mapping
@@ -153,7 +167,7 @@ class TestAD5XJobControl:
                 slot_id=1,
                 material_name="PLA",
                 tool_material_color="#FF0000",
-                slot_material_color="#FF0000"
+                slot_material_color="#FF0000",
             )
 
             result = client.job_control._validate_material_mappings([valid_mapping])
@@ -163,7 +177,9 @@ class TestAD5XJobControl:
         """Test that empty material mappings array is rejected"""
         config = get_test_printer_config()
 
-        async with FlashForgeClient(config["ip"], config["serial_number"], config["check_code"]) as client:
+        async with FlashForgeClient(
+            config["ip"], config["serial_number"], config["check_code"]
+        ) as client:
             assert await client.initialize()
 
             result = client.job_control._validate_material_mappings([])
@@ -173,7 +189,9 @@ class TestAD5XJobControl:
         """Test that more than 4 mappings are rejected"""
         config = get_test_printer_config()
 
-        async with FlashForgeClient(config["ip"], config["serial_number"], config["check_code"]) as client:
+        async with FlashForgeClient(
+            config["ip"], config["serial_number"], config["check_code"]
+        ) as client:
             assert await client.initialize()
 
             too_many = [
@@ -182,7 +200,7 @@ class TestAD5XJobControl:
                     slot_id=1,
                     material_name="PLA",
                     tool_material_color="#FF0000",
-                    slot_material_color="#FF0000"
+                    slot_material_color="#FF0000",
                 )
                 for _ in range(5)
             ]
@@ -194,7 +212,9 @@ class TestAD5XJobControl:
         """Test base64 encoding of material mappings"""
         config = get_test_printer_config()
 
-        async with FlashForgeClient(config["ip"], config["serial_number"], config["check_code"]) as client:
+        async with FlashForgeClient(
+            config["ip"], config["serial_number"], config["check_code"]
+        ) as client:
             assert await client.initialize()
 
             mapping = AD5XMaterialMapping(
@@ -202,7 +222,7 @@ class TestAD5XJobControl:
                 slot_id=1,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
 
             encoded = client.job_control._encode_material_mappings_to_base64([mapping])
@@ -213,6 +233,7 @@ class TestAD5XJobControl:
 
             # Should be valid base64 (will raise if invalid)
             import base64
+
             decoded = base64.b64decode(encoded)
             assert len(decoded) > 0
 
@@ -220,7 +241,9 @@ class TestAD5XJobControl:
         """Test that AD5X printer validation works"""
         config = get_test_printer_config()
 
-        async with FlashForgeClient(config["ip"], config["serial_number"], config["check_code"]) as client:
+        async with FlashForgeClient(
+            config["ip"], config["serial_number"], config["check_code"]
+        ) as client:
             assert await client.initialize()
 
             # Should pass because we're connected to an AD5X
@@ -274,7 +297,9 @@ class TestAD5XDetection:
         """Test that is_ad5x property is correctly set"""
         config = get_test_printer_config()
 
-        async with FlashForgeClient(config["ip"], config["serial_number"], config["check_code"]) as client:
+        async with FlashForgeClient(
+            config["ip"], config["serial_number"], config["check_code"]
+        ) as client:
             assert await client.initialize()
 
             # Should be True for AD5X printer

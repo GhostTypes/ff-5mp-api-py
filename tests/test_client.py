@@ -1,6 +1,7 @@
 """
 Unit tests for the main FlashForgeClient class.
 """
+
 import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -10,11 +11,9 @@ import pytest
 from flashforge.client import FlashForgeClient, MachineInfoParser
 from flashforge.models import FFMachineInfo
 from flashforge.models.responses import DetailResponse
-
 from tests.fixtures.printer_responses import (
     AD5X_INFO_RESPONSE,
     FIVE_M_PRO_INFO_RESPONSE,
-    PRODUCT_RESPONSE,
 )
 
 

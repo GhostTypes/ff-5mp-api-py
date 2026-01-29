@@ -89,14 +89,14 @@ def skip_if_no_printer(reason: str = "Requires live printer connection"):
         pytest.mark.skipif decorator
     """
     return pytest.mark.skipif(
-        SKIP_LIVE_TESTS,
-        reason=f"{reason} (SKIP_LIVE_TESTS=True in printer_config.py)"
+        SKIP_LIVE_TESTS, reason=f"{reason} (SKIP_LIVE_TESTS=True in printer_config.py)"
     )
 
 
 # =============================================================================
 # VALIDATION
 # =============================================================================
+
 
 def validate_config() -> bool:
     """
@@ -109,9 +109,9 @@ def validate_config() -> bool:
         return True  # No validation needed if skipping live tests
 
     has_defaults = (
-        PRINTER_IP == "192.168.1.100" or
-        SERIAL_NUMBER == "your_serial_number_here" or
-        CHECK_CODE == "your_check_code_here"
+        PRINTER_IP == "192.168.1.100"
+        or SERIAL_NUMBER == "your_serial_number_here"
+        or CHECK_CODE == "your_check_code_here"
     )
 
     if has_defaults:

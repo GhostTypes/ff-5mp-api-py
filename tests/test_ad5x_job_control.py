@@ -7,8 +7,9 @@ material mapping validation, base64 encoding, and printer validation.
 
 import base64
 import json
+from unittest.mock import Mock
+
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
 
 from flashforge.api.controls.job_control import JobControl
 from flashforge.models.responses import AD5XMaterialMapping
@@ -31,7 +32,7 @@ class TestMaterialMappingValidation:
                 slot_id=1,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
         ]
         assert self.job_control._validate_material_mappings(mappings) is True
@@ -44,7 +45,7 @@ class TestMaterialMappingValidation:
                 slot_id=i + 1,
                 material_name=f"Material{i}",
                 tool_material_color="#FF0000",
-                slot_material_color="#00FF00"
+                slot_material_color="#00FF00",
             )
             for i in range(4)
         ]
@@ -62,7 +63,7 @@ class TestMaterialMappingValidation:
                 slot_id=1,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
             for _ in range(5)
         ]
@@ -72,52 +73,56 @@ class TestMaterialMappingValidation:
         """Test Pydantic validation rejects toolId < 0"""
         # Pydantic should reject this at creation time
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             AD5XMaterialMapping(
                 tool_id=-1,
                 slot_id=1,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
 
     def test_validate_rejects_invalid_tool_id_too_high(self):
         """Test Pydantic validation rejects toolId > 3"""
         # Pydantic should reject this at creation time
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             AD5XMaterialMapping(
                 tool_id=4,
                 slot_id=1,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
 
     def test_validate_rejects_invalid_slot_id_zero(self):
         """Test Pydantic validation rejects slotId < 1"""
         # Pydantic should reject this at creation time
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             AD5XMaterialMapping(
                 tool_id=0,
                 slot_id=0,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
 
     def test_validate_rejects_invalid_slot_id_too_high(self):
         """Test Pydantic validation rejects slotId > 4"""
         # Pydantic should reject this at creation time
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             AD5XMaterialMapping(
                 tool_id=0,
                 slot_id=5,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
 
     def test_validate_rejects_empty_material_name(self):
@@ -128,7 +133,7 @@ class TestMaterialMappingValidation:
                 slot_id=1,
                 material_name="",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
         ]
         assert self.job_control._validate_material_mappings(mappings) is False
@@ -141,13 +146,15 @@ class TestMaterialMappingValidation:
                 slot_id=1,
                 material_name="   ",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
         ]
         assert self.job_control._validate_material_mappings(mappings) is False
 
     def test_validate_rejects_invalid_tool_color_format(self):
         """Test validation rejects invalid toolMaterialColor format"""
+        from pydantic import ValidationError
+
         invalid_colors = [
             "FFFFFF",  # Missing #
             "#FFF",  # Too short
@@ -158,30 +165,27 @@ class TestMaterialMappingValidation:
         ]
 
         for color in invalid_colors:
-            mappings = [
+            with pytest.raises(ValidationError):
                 AD5XMaterialMapping(
                     tool_id=0,
                     slot_id=1,
                     material_name="PLA",
                     tool_material_color=color,
-                    slot_material_color="#000000"
+                    slot_material_color="#000000",
                 )
-            ]
-            assert self.job_control._validate_material_mappings(mappings) is False, \
-                f"Should reject tool color: {color}"
 
     def test_validate_rejects_invalid_slot_color_format(self):
         """Test validation rejects invalid slotMaterialColor format"""
-        mappings = [
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
             AD5XMaterialMapping(
                 tool_id=0,
                 slot_id=1,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="INVALID"
+                slot_material_color="INVALID",
             )
-        ]
-        assert self.job_control._validate_material_mappings(mappings) is False
 
     def test_validate_accepts_valid_color_formats(self):
         """Test validation accepts various valid hex color formats"""
@@ -201,11 +205,12 @@ class TestMaterialMappingValidation:
                     slot_id=1,
                     material_name="PLA",
                     tool_material_color=color,
-                    slot_material_color="#000000"
+                    slot_material_color="#000000",
                 )
             ]
-            assert self.job_control._validate_material_mappings(mappings) is True, \
+            assert self.job_control._validate_material_mappings(mappings) is True, (
                 f"Should accept color: {color}"
+            )
 
 
 class TestBase64Encoding:
@@ -225,14 +230,14 @@ class TestBase64Encoding:
                 slot_id=1,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
         ]
 
         result = self.job_control._encode_material_mappings_to_base64(mappings)
 
         # Verify it's valid base64
-        decoded = base64.b64decode(result).decode('utf-8')
+        decoded = base64.b64decode(result).decode("utf-8")
         data = json.loads(decoded)
 
         assert len(data) == 1
@@ -250,7 +255,7 @@ class TestBase64Encoding:
                 slot_id=i + 1,
                 material_name=f"Material{i}",
                 tool_material_color="#FF0000",
-                slot_material_color="#00FF00"
+                slot_material_color="#00FF00",
             )
             for i in range(3)
         ]
@@ -258,7 +263,7 @@ class TestBase64Encoding:
         result = self.job_control._encode_material_mappings_to_base64(mappings)
 
         # Verify it's valid base64 and decodes correctly
-        decoded = base64.b64decode(result).decode('utf-8')
+        decoded = base64.b64decode(result).decode("utf-8")
         data = json.loads(decoded)
 
         assert len(data) == 3
@@ -275,7 +280,7 @@ class TestBase64Encoding:
                 slot_id=1,
                 material_name="PLA",
                 tool_material_color="#FFFFFF",
-                slot_material_color="#000000"
+                slot_material_color="#000000",
             )
         ]
 

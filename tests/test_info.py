@@ -1,16 +1,16 @@
 """
 Unit tests for the Info module.
 """
+
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from flashforge.client import FlashForgeClient
 from flashforge.api.controls.info import Info
+from flashforge.client import FlashForgeClient
 from flashforge.models import FFMachineInfo, MachineState
 from flashforge.models.responses import DetailResponse
-
 from tests.fixtures.printer_responses import (
     AD5X_INFO_RESPONSE,
     FIVE_M_PRO_INFO_RESPONSE,

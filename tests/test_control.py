@@ -1,12 +1,13 @@
 """
 Unit tests for control operations.
 """
+
 from unittest.mock import AsyncMock
 
 import pytest
 
-from flashforge.client import FlashForgeClient
 from flashforge.api.controls.control import Commands, Control
+from flashforge.client import FlashForgeClient
 from flashforge.models import FFMachineInfo
 
 

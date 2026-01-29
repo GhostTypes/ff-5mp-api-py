@@ -4,11 +4,10 @@ FlashForge Python API - Printer Discovery (FIXED VERSION)
 UDP-based printer discovery implementation that finds FlashForge printers on the local network.
 Fixed to match the original TypeScript implementation behavior.
 """
+
 import asyncio
 import logging
-import socket
 from dataclasses import dataclass
-from typing import List, Optional
 
 import netifaces
 
@@ -21,6 +20,7 @@ class FlashForgePrinter:
     Represents a discovered FlashForge 3D printer.
     Stores information such as name, serial number, and IP address.
     """
+
     name: str = ""
     serial_number: str = ""
     ip_address: str = ""
@@ -45,7 +45,7 @@ class FlashForgePrinterDiscovery:
     # The port we listen on for responses (must match TypeScript implementation)
     LISTEN_PORT = 18007
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the printer discovery client."""
         self.discovery_port = self.DISCOVERY_PORT
         self.listen_port = self.LISTEN_PORT
@@ -53,37 +53,55 @@ class FlashForgePrinterDiscovery:
         # The discovery UDP packet is a 20-byte message.
         # It starts with "www.usr" followed by specific bytes.
         # This packet structure is based on observations from FlashPrint software.
-        self.discovery_message = bytes([
-            0x77, 0x77, 0x77, 0x2e, 0x75, 0x73, 0x72, 0x22,  # "www.usr"
-            0x65, 0x36, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00
-        ])
+        self.discovery_message = bytes(
+            [
+                0x77,
+                0x77,
+                0x77,
+                0x2E,
+                0x75,
+                0x73,
+                0x72,
+                0x22,  # "www.usr"
+                0x65,
+                0x36,
+                0xC0,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+            ]
+        )
 
     async def discover_printers_async(
-        self,
-        timeout_ms: int = 10000,
-        idle_timeout_ms: int = 1500,
-        max_retries: int = 3
-    ) -> List[FlashForgePrinter]:
+        self, timeout_ms: int = 10000, idle_timeout_ms: int = 1500, max_retries: int = 3
+    ) -> list[FlashForgePrinter]:
         """
         Discovers FlashForge printers on the network asynchronously.
-        
+
         FIXED VERSION - Uses proper asyncio UDP socket handling that matches the TypeScript implementation.
-        
+
         Args:
             timeout_ms: The total time (in milliseconds) to wait for printer responses
-            idle_timeout_ms: The time (in milliseconds) to wait for additional responses 
+            idle_timeout_ms: The time (in milliseconds) to wait for additional responses
                            after the last received one
             max_retries: The maximum number of discovery attempts
-            
+
         Returns:
             A list of FlashForgePrinter objects found on the network
         """
-        printers: List[FlashForgePrinter] = []
+        printers: list[FlashForgePrinter] = []
         broadcast_addresses = self._get_broadcast_addresses()
         attempt = 0
 
-        logger.info(f"Starting printer discovery with {len(broadcast_addresses)} broadcast addresses")
+        logger.info(
+            f"Starting printer discovery with {len(broadcast_addresses)} broadcast addresses"
+        )
 
         while attempt < max_retries:
             attempt += 1
@@ -93,16 +111,20 @@ class FlashForgePrinterDiscovery:
                 # Use asyncio datagram endpoint for proper UDP handling
                 transport, protocol = await asyncio.get_event_loop().create_datagram_endpoint(
                     lambda: DiscoveryProtocol(self),
-                    local_addr=('0.0.0.0', self.listen_port),
-                    allow_broadcast=True
+                    local_addr=("0.0.0.0", self.listen_port),
+                    allow_broadcast=True,
                 )
 
                 try:
                     # Send discovery messages to all broadcast addresses
                     for broadcast_address in broadcast_addresses:
                         try:
-                            transport.sendto(self.discovery_message, (broadcast_address, self.discovery_port))
-                            logger.debug(f"Sent discovery message to {broadcast_address}:{self.discovery_port}")
+                            transport.sendto(
+                                self.discovery_message, (broadcast_address, self.discovery_port)
+                            )
+                            logger.debug(
+                                f"Sent discovery message to {broadcast_address}:{self.discovery_port}"
+                            )
                         except Exception as e:
                             logger.warning(f"Failed to send to {broadcast_address}: {e}")
 
@@ -138,18 +160,18 @@ class FlashForgePrinterDiscovery:
 
         return final_printers
 
-    def _parse_printer_response(self, response: bytes, ip_address: str) -> Optional[FlashForgePrinter]:
+    def _parse_printer_response(self, response: bytes, ip_address: str) -> FlashForgePrinter | None:
         """
         Parses the UDP response received from a FlashForge printer.
-        
+
         The response is a buffer containing printer information at specific offsets:
         - Printer Name: ASCII string at offset 0x00 (32 bytes)
         - Serial Number: ASCII string at offset 0x92 (32 bytes)
-        
+
         Args:
             response: The bytes containing the printer's response
             ip_address: The IP address from which the response was received
-            
+
         Returns:
             A FlashForgePrinter object if parsing is successful, otherwise None
         """
@@ -164,19 +186,19 @@ class FlashForgePrinterDiscovery:
 
         try:
             # Printer name is at offset 0x00, padded with null characters
-            name = response[0:32].decode('ascii', errors='ignore').rstrip('\x00')
+            name = response[0:32].decode("ascii", errors="ignore").rstrip("\x00")
 
             # Serial number is at offset 0x92, padded with null characters
-            serial_number = response[0x92:0x92 + 32].decode('ascii', errors='ignore').rstrip('\x00')
+            serial_number = (
+                response[0x92 : 0x92 + 32].decode("ascii", errors="ignore").rstrip("\x00")
+            )
 
             if not name and not serial_number:
                 logger.warning(f"Empty name and serial from {ip_address}")
                 return None
 
             printer = FlashForgePrinter(
-                name=name,
-                serial_number=serial_number,
-                ip_address=ip_address
+                name=name, serial_number=serial_number, ip_address=ip_address
             )
 
             return printer
@@ -185,14 +207,14 @@ class FlashForgePrinterDiscovery:
             logger.error(f"Error parsing response from {ip_address}: {e}")
             return None
 
-    def _get_broadcast_addresses(self) -> List[str]:
+    def _get_broadcast_addresses(self) -> list[str]:
         """
         Retrieves a list of broadcast addresses for all active IPv4 network interfaces.
-        
+
         Returns:
             A list of broadcast address strings
         """
-        broadcast_addresses: List[str] = []
+        broadcast_addresses: list[str] = []
 
         try:
             # Get all network interfaces
@@ -205,18 +227,20 @@ class FlashForgePrinterDiscovery:
 
                     for addr_info in addresses[netifaces.AF_INET]:
                         # Skip loopback interfaces
-                        if addr_info.get('addr', '').startswith('127.'):
+                        if addr_info.get("addr", "").startswith("127."):
                             continue
 
                         # Calculate broadcast address if netmask is available
-                        ip_addr = addr_info.get('addr')
-                        netmask = addr_info.get('netmask')
+                        ip_addr = addr_info.get("addr")
+                        netmask = addr_info.get("netmask")
 
                         if ip_addr and netmask:
                             broadcast = self._calculate_broadcast_address(ip_addr, netmask)
                             if broadcast and broadcast not in broadcast_addresses:
                                 broadcast_addresses.append(broadcast)
-                                logger.debug(f"Added broadcast address: {broadcast} (interface: {interface_name})")
+                                logger.debug(
+                                    f"Added broadcast address: {broadcast} (interface: {interface_name})"
+                                )
 
                 except Exception as e:
                     logger.warning(f"Error processing interface {interface_name}: {e}")
@@ -225,47 +249,49 @@ class FlashForgePrinterDiscovery:
         except Exception as e:
             logger.error(f"Error getting network interfaces: {e}")
             # Fallback to common broadcast addresses
-            broadcast_addresses = ['255.255.255.255', '192.168.1.255', '192.168.0.255']
+            broadcast_addresses = ["255.255.255.255", "192.168.1.255", "192.168.0.255"]
             logger.info("Using fallback broadcast addresses")
 
         # Always include the general broadcast address
-        if '255.255.255.255' not in broadcast_addresses:
-            broadcast_addresses.append('255.255.255.255')
+        if "255.255.255.255" not in broadcast_addresses:
+            broadcast_addresses.append("255.255.255.255")
 
         logger.debug(f"Using broadcast addresses: {broadcast_addresses}")
         return broadcast_addresses
 
-    def _calculate_broadcast_address(self, ip_address: str, subnet_mask: str) -> Optional[str]:
+    def _calculate_broadcast_address(self, ip_address: str, subnet_mask: str) -> str | None:
         """
         Calculates the broadcast address for a given IP address and subnet mask.
-        
+
         Args:
             ip_address: The IPv4 address string (e.g., "192.168.1.10")
             subnet_mask: The IPv4 subnet mask string (e.g., "255.255.255.0")
-            
+
         Returns:
             The calculated broadcast address string, or None if input is invalid
         """
         try:
             # Convert IP and subnet to arrays of numbers
-            ip_parts = [int(x) for x in ip_address.split('.')]
-            mask_parts = [int(x) for x in subnet_mask.split('.')]
+            ip_parts = [int(x) for x in ip_address.split(".")]
+            mask_parts = [int(x) for x in subnet_mask.split(".")]
 
             if len(ip_parts) != 4 or len(mask_parts) != 4:
                 return None
 
             # Calculate broadcast address: IP | (~MASK)
             broadcast_parts = [ip_parts[i] | (~mask_parts[i] & 255) for i in range(4)]
-            return '.'.join(map(str, broadcast_parts))
+            return ".".join(map(str, broadcast_parts))
 
         except Exception as e:
-            logger.warning(f"Error calculating broadcast address for {ip_address}/{subnet_mask}: {e}")
+            logger.warning(
+                f"Error calculating broadcast address for {ip_address}/{subnet_mask}: {e}"
+            )
             return None
 
     def print_debug_info(self, response: bytes, ip_address: str) -> None:
         """
         Prints detailed debugging information about a received UDP response.
-        
+
         Args:
             response: The bytes containing the response data
             ip_address: The IP address from which the response was received
@@ -293,14 +319,14 @@ class FlashForgePrinterDiscovery:
             for j in range(16):
                 if i + j < len(response):
                     c = response[i + j]
-                    parts.append(chr(c) if 32 <= c <= 126 else '.')
+                    parts.append(chr(c) if 32 <= c <= 126 else ".")
 
             print("".join(parts))
 
         # ASCII dump
         print("ASCII dump:")
         try:
-            ascii_content = response.decode('ascii', errors='replace')
+            ascii_content = response.decode("ascii", errors="replace")
             print(repr(ascii_content))
         except Exception as e:
             print(f"Error decoding ASCII: {e}")
@@ -312,17 +338,17 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
     This matches the event-driven approach used in the TypeScript implementation.
     """
 
-    def __init__(self, discovery: FlashForgePrinterDiscovery):
+    def __init__(self, discovery: FlashForgePrinterDiscovery) -> None:
         self.discovery = discovery
-        self.printers: List[FlashForgePrinter] = []
+        self.printers: list[FlashForgePrinter] = []
         self.response_event = asyncio.Event()
         self.last_response_time = 0.0
 
-    def connection_made(self, transport):
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
         self.transport = transport
         logger.debug("Discovery protocol connection established")
 
-    def datagram_received(self, data: bytes, addr):
+    def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
         """Handle incoming UDP datagram (printer response)."""
         ip_address = addr[0]
         logger.debug(f"Received {len(data)} bytes from {ip_address}")
@@ -338,24 +364,28 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
         self.response_event.set()
         self.response_event.clear()  # Reset for next response
 
-    def error_received(self, exc):
+    def error_received(self, exc: Exception) -> None:
         logger.error(f"Discovery protocol error: {exc}")
 
-    async def wait_for_responses(self, total_timeout: float, idle_timeout: float) -> List[FlashForgePrinter]:
+    async def wait_for_responses(
+        self, total_timeout: float, idle_timeout: float
+    ) -> list[FlashForgePrinter]:
         """
         Wait for printer responses with total and idle timeouts.
-        
+
         Args:
             total_timeout: Maximum total time to wait for responses
             idle_timeout: Maximum time to wait between responses
-            
+
         Returns:
             List of discovered printers
         """
         start_time = asyncio.get_event_loop().time()
         self.last_response_time = start_time
 
-        logger.debug(f"Waiting for responses (total timeout: {total_timeout}s, idle timeout: {idle_timeout}s)")
+        logger.debug(
+            f"Waiting for responses (total timeout: {total_timeout}s, idle timeout: {idle_timeout}s)"
+        )
 
         while True:
             current_time = asyncio.get_event_loop().time()
@@ -375,12 +405,12 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
                 remaining_total = total_timeout - (current_time - start_time)
                 remaining_idle = idle_timeout - (current_time - self.last_response_time)
                 wait_time = min(remaining_total, remaining_idle, 0.1)  # Max 100ms wait
-                
+
                 if wait_time <= 0:
                     break
-                    
+
                 await asyncio.wait_for(self.response_event.wait(), timeout=wait_time)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Continue to check timeouts
                 continue
 

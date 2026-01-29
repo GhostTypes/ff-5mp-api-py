@@ -13,15 +13,15 @@ from .temp_info import TempData, TempInfo
 from .thumbnail_info import ThumbnailInfo
 
 __all__ = [
-    'PrinterInfo',
-    'TempInfo',
-    'TempData',
-    'LocationInfo',
-    'EndstopStatus',
-    'MachineStatus',
-    'MoveMode',
-    'Status',
-    'Endstop',
-    'PrintStatus',
-    'ThumbnailInfo',
+    "PrinterInfo",
+    "TempInfo",
+    "TempData",
+    "LocationInfo",
+    "EndstopStatus",
+    "MachineStatus",
+    "MoveMode",
+    "Status",
+    "Endstop",
+    "PrintStatus",
+    "ThumbnailInfo",
 ]

@@ -1,6 +1,7 @@
 """
 Unit tests for the FlashForge TCP client.
 """
+
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
@@ -8,7 +9,6 @@ import pytest
 
 from flashforge.tcp import GCodes
 from flashforge.tcp.tcp_client import FlashForgeTcpClient
-
 from tests.fixtures.printer_responses import (
     FILE_LIST_TCP_EMPTY,
     FILE_LIST_TCP_PRO,
