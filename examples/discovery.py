@@ -3,17 +3,19 @@ FlashForge Python API - Discovery Example
 
 Demonstrates various ways to discover and connect to FlashForge printers.
 """
+
 import asyncio
+
 from flashforge import FlashForgeClient, FlashForgePrinterDiscovery
 
 
 async def basic_discovery():
     """Simple printer discovery."""
     print("=== Basic Discovery ===\n")
-    
+
     discovery = FlashForgePrinterDiscovery()
     printers = await discovery.discover_printers_async()
-    
+
     if printers:
         print(f"Found {len(printers)} printer(s):")
         for printer in printers:
@@ -25,14 +27,14 @@ async def basic_discovery():
 async def discovery_with_custom_timeouts():
     """Discovery with custom timeout settings."""
     print("\n=== Discovery with Custom Timeouts ===\n")
-    
+
     discovery = FlashForgePrinterDiscovery()
     printers = await discovery.discover_printers_async(
-        timeout_ms=5000,        # Total timeout: 5 seconds
-        idle_timeout_ms=1500,   # Idle timeout: 1.5 seconds
-        max_retries=2           # Retry twice
+        timeout_ms=5000,  # Total timeout: 5 seconds
+        idle_timeout_ms=1500,  # Idle timeout: 1.5 seconds
+        max_retries=2,  # Retry twice
     )
-    
+
     if printers:
         print(f"Found {len(printers)} printer(s)")
         for i, printer in enumerate(printers, 1):
@@ -47,15 +49,15 @@ async def discovery_with_custom_timeouts():
 async def manual_connection():
     """Connect without discovery using known IP address."""
     print("\n=== Manual Connection ===\n")
-    
+
     # Use known printer details
-    IP_ADDRESS = "192.168.1.100"
-    SERIAL_NUMBER = "SN123456"
-    CHECK_CODE = ""
-    
-    print(f"Connecting to {IP_ADDRESS}...")
-    
-    async with FlashForgeClient(IP_ADDRESS, SERIAL_NUMBER, CHECK_CODE) as client:
+    ip_address = "192.168.1.100"
+    serial_number = "SN123456"
+    check_code = ""
+
+    print(f"Connecting to {ip_address}...")
+
+    async with FlashForgeClient(ip_address, serial_number, check_code) as client:
         if await client.initialize():
             print(f"Connected to {client.printer_name}")
             print(f"Firmware: {client.firmware_version}")
@@ -66,11 +68,11 @@ async def manual_connection():
 async def discovery_with_error_handling():
     """Discovery with comprehensive error handling."""
     print("\n=== Discovery with Error Handling ===\n")
-    
+
     try:
         discovery = FlashForgePrinterDiscovery()
         printers = await discovery.discover_printers_async()
-        
+
         if not printers:
             print("No printers found")
             print("\nTroubleshooting:")
@@ -78,15 +80,13 @@ async def discovery_with_error_handling():
             print("  - Check network connection")
             print("  - Verify firewall settings")
             return
-        
+
         # Try to connect to first printer
         printer = printers[0]
         print(f"Connecting to {printer.name}...")
-        
+
         async with FlashForgeClient(
-            printer.ip_address,
-            printer.serial_number,
-            printer.check_code
+            printer.ip_address, printer.serial_number, printer.check_code
         ) as client:
             if await client.initialize():
                 status = await client.get_printer_status()
@@ -94,7 +94,7 @@ async def discovery_with_error_handling():
                     print(f"Status: {status.machine_state.value}")
             else:
                 print("Failed to initialize connection")
-                
+
     except Exception as e:
         print(f"Error: {e}")
 

@@ -6,6 +6,6 @@ from .gcode_controller import GCodeController
 from .gcodes import GCodes
 
 __all__ = [
-    'GCodes',
-    'GCodeController',
+    "GCodes",
+    "GCodeController",
 ]

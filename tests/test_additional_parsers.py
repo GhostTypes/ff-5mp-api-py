@@ -1,7 +1,6 @@
 """
 Additional parser unit tests.
 """
-import pytest
 
 from flashforge.tcp.parsers.location_info import LocationInfo
 from flashforge.tcp.parsers.printer_info import PrinterInfo
@@ -72,13 +71,7 @@ def test_parse_printer_info_complete():
 
 def test_parse_printer_info_minimal():
     """Minimal responses still parse required fields."""
-    replay = (
-        "ok M115\n"
-        "Machine Type: Adventurer\n"
-        "Machine Name: Bench\n"
-        "Firmware: V1.0.0\n"
-        "SN: SN123\n"
-    )
+    replay = "ok M115\nMachine Type: Adventurer\nMachine Name: Bench\nFirmware: V1.0.0\nSN: SN123\n"
     info = PrinterInfo().from_replay(replay)
     assert info is not None
     assert info.type_name == "Adventurer"

@@ -2,6 +2,7 @@ class Endpoints:
     """
     Endpoints for the "new" HTTP API
     """
+
     CONTROL = "/control"
     DETAIL = "/detail"
     GCODE_LIST = "/gcodeList"

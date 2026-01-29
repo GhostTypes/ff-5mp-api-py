@@ -1,16 +1,17 @@
 """
 FlashForge Python API - Files Module
 """
+
 import base64
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 import aiohttp
+from pydantic import ValidationError
 
 from ...models.machine_info import FFGcodeFileEntry
-from ...models.responses import GenericResponse, GCodeListResponse, ThumbnailResponse
+from ...models.responses import GCodeListResponse, ThumbnailResponse
 from ..constants.endpoints import Endpoints
 from ..network.utils import NetworkUtils
-from pydantic import ValidationError
 
 if TYPE_CHECKING:
     from ...client import FlashForgeClient
@@ -25,34 +26,34 @@ class Files:
     def __init__(self, client: "FlashForgeClient"):
         """
         Creates an instance of the Files class.
-        
+
         Args:
             client: The FlashForgeClient instance used for communication with the printer.
         """
         self.client = client
 
-    async def get_file_list(self) -> List[str]:
+    async def get_file_list(self) -> list[str]:
         """
         Retrieves a list of files stored locally on the printer.
-        
+
         Returns:
             A list of file names, or empty list if retrieval fails.
         """
         # This method uses the TCP client to get file list
-        if hasattr(self.client, 'tcp_client') and self.client.tcp_client:
+        if hasattr(self.client, "tcp_client") and self.client.tcp_client:
             return await self.client.tcp_client.get_file_list_async()
         return []
 
-    async def get_local_file_list(self) -> List[str]:
+    async def get_local_file_list(self) -> list[str]:
         """
         Retrieves a list of files stored locally on the printer.
-        
+
         Returns:
             A list of file names, or empty list if retrieval fails.
         """
         return await self.get_file_list()
 
-    async def get_recent_file_list(self) -> List[FFGcodeFileEntry]:
+    async def get_recent_file_list(self) -> list[FFGcodeFileEntry]:
         """
         Retrieves a list of the 10 most recently printed files from the printer's API.
         For AD5X and newer printers, returns detailed file entries with material info.
@@ -61,17 +62,14 @@ class Files:
         Returns:
             A list of FFGcodeFileEntry objects. Returns an empty list if the request fails or an error occurs.
         """
-        payload = {
-            "serialNumber": self.client.serial_number,
-            "checkCode": self.client.check_code
-        }
+        payload = {"serialNumber": self.client.serial_number, "checkCode": self.client.check_code}
 
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     self.client.get_endpoint(Endpoints.GCODE_LIST),
                     json=payload,
-                    headers={"Content-Type": "application/json"}
+                    headers={"Content-Type": "application/json"},
                 ) as response:
                     if response.status != 200:
                         return []
@@ -84,6 +82,7 @@ class Files:
                         # Fallback: manually parse as JSON if Content-Type is malformed
                         text = await response.text()
                         import json
+
                         data = json.loads(text)
 
                     if not NetworkUtils.is_ok(data):
@@ -96,7 +95,7 @@ class Files:
                     except ValidationError:
                         raw_list = data.get("gcodeList", [])
                         if isinstance(raw_list, list):
-                            entries: List[FFGcodeFileEntry] = []
+                            entries: list[FFGcodeFileEntry] = []
                             for file_name in raw_list:
                                 if isinstance(file_name, str):
                                     entries.append(
@@ -120,15 +119,17 @@ class Files:
                         if isinstance(first_item, str):
                             # Convert string array to FFGcodeFileEntry objects
                             return [
-                                FFGcodeFileEntry(
-                                    gcodeFileName=file_name,
-                                    printingTime=0
-                                )
+                                FFGcodeFileEntry(gcodeFileName=file_name, printingTime=0)
                                 for file_name in result.gcode_list
+                                if isinstance(file_name, str)
                             ]
-                        else:
-                            # Already FFGcodeFileEntry objects
-                            return result.gcode_list
+                        elif isinstance(first_item, FFGcodeFileEntry):
+                            # Already FFGcodeFileEntry objects - need explicit type narrowing
+                            return [
+                                item
+                                for item in result.gcode_list
+                                if isinstance(item, FFGcodeFileEntry)
+                            ]
 
                     return []
 
@@ -136,7 +137,7 @@ class Files:
             print(f"GetRecentFileList error: {err}")
             return []
 
-    async def get_gcode_thumbnail(self, file_name: str) -> Optional[bytes]:
+    async def get_gcode_thumbnail(self, file_name: str) -> bytes | None:
         """
         Retrieves the thumbnail image for a specified G-code file.
         The image data is returned as bytes.
@@ -151,7 +152,7 @@ class Files:
         payload = {
             "serialNumber": self.client.serial_number,
             "checkCode": self.client.check_code,
-            "fileName": file_name
+            "fileName": file_name,
         }
 
         try:
@@ -159,7 +160,7 @@ class Files:
                 async with session.post(
                     self.client.get_endpoint(Endpoints.GCODE_THUMB),
                     json=payload,
-                    headers={"Content-Type": "application/json"}
+                    headers={"Content-Type": "application/json"},
                 ) as response:
                     if response.status != 200:
                         return None
@@ -172,6 +173,7 @@ class Files:
                         # Fallback: manually parse as JSON if Content-Type is malformed
                         text = await response.text()
                         import json
+
                         data = json.loads(text)
 
                     if NetworkUtils.is_ok(data):

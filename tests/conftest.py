@@ -1,6 +1,7 @@
 """
 Test configuration for FlashForge Python API.
 """
+
 import asyncio
 
 import pytest

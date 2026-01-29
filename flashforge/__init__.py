@@ -7,28 +7,28 @@ temperature control, and real-time communication.
 
 Example:
     Basic usage example:
-    
+
     ```python
     import asyncio
     from flashforge import FlashForgeClient
-    
+
     async def main():
         async with FlashForgeClient("192.168.1.100", "serial123", "check456") as client:
             if await client.initialize():
                 print(f"Connected to {client.printer_name}")
-                
+
                 # Get printer status
                 status = await client.get_printer_status()
                 print(f"Status: {status.machine_state}")
-                
+
                 # Control operations
                 await client.control.set_led_on()
                 await client.control.home_axes()
-                
+
                 # Temperature monitoring
                 temps = await client.get_temperatures()
                 print(f"Extruder: {temps.extruder_temp}°C")
-    
+
     asyncio.run(main())
     ```
 """
@@ -44,12 +44,13 @@ from .api.controls import (
     JobControl,
     TempControl,
 )
+from .api.filament import Filament
+from .api.misc import Temperature as TempWrapper
+from .api.misc import format_scientific_notation
+from .api.network.fnet_code import FNetCode
 
 # Import utility classes
 from .api.network.utils import NetworkUtils
-from .api.network.fnet_code import FNetCode
-from .api.filament import Filament
-from .api.misc import Temperature as TempWrapper, format_scientific_notation
 from .client import FlashForgeClient
 
 # Import discovery classes
@@ -60,25 +61,25 @@ from .discovery import (
 
 # Import key models for convenience
 from .models import (
-    DetailResponse,
-    FFMachineInfo,
-    FFPrinterDetail,
-    FFGcodeFileEntry,
-    FFGcodeToolData,
-    FilamentArgs,
-    GenericResponse,
-    MachineState,
-    Product,
-    ProductResponse,
-    Temperature,
-    SlotInfo,
-    MatlStationInfo,
-    IndepMatlInfo,
-    AD5XMaterialMapping,
     AD5XLocalJobParams,
+    AD5XMaterialMapping,
     AD5XSingleColorJobParams,
     AD5XUploadParams,
+    DetailResponse,
+    FFGcodeFileEntry,
+    FFGcodeToolData,
+    FFMachineInfo,
+    FFPrinterDetail,
+    FilamentArgs,
     GCodeListResponse,
+    GenericResponse,
+    IndepMatlInfo,
+    MachineState,
+    MatlStationInfo,
+    Product,
+    ProductResponse,
+    SlotInfo,
+    Temperature,
     ThumbnailResponse,
 )
 from .tcp import (
@@ -112,7 +113,6 @@ __description__ = "Python library for controlling FlashForge 3D printers"
 __all__ = [
     # Main client class
     "FlashForgeClient",
-
     # Data models
     "FFMachineInfo",
     "FFPrinterDetail",
@@ -125,7 +125,6 @@ __all__ = [
     "ProductResponse",
     "Product",
     "FilamentArgs",
-
     # AD5X models
     "SlotInfo",
     "MatlStationInfo",
@@ -136,14 +135,12 @@ __all__ = [
     "AD5XUploadParams",
     "GCodeListResponse",
     "ThumbnailResponse",
-
     # Control classes for advanced usage
     "Control",
     "JobControl",
     "Info",
     "Files",
     "TempControl",
-
     # TCP classes for low-level operations
     "TcpClient",
     "FlashForgeTcpClient",
@@ -160,11 +157,9 @@ __all__ = [
     "ThumbnailInfo",
     "GCodes",
     "GCodeController",
-
     # Discovery classes
     "FlashForgePrinter",
     "FlashForgePrinterDiscovery",
-
     # Utilities
     "NetworkUtils",
     "FNetCode",
@@ -173,7 +168,6 @@ __all__ = [
     "format_scientific_notation",
     "Endpoints",
     "Commands",
-
     # Package metadata
     "__version__",
     "__author__",

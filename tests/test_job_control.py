@@ -1,14 +1,14 @@
 """
 Unit tests for job control operations.
 """
+
 import json
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
-from flashforge.client import FlashForgeClient
 from flashforge.api.controls.job_control import JobControl
+from flashforge.client import FlashForgeClient
 
 
 def _mock_session(response_payload: dict, status: int = 200):

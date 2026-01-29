@@ -8,24 +8,23 @@ sending raw commands, handling responses, and maintaining keep-alive connections
 import asyncio
 import logging
 import re
-from typing import List, Optional
 
 from .gcode.gcodes import GCodes
 
 logger = logging.getLogger(__name__)
 
 # Regex for invalid characters in filenames
-INVALID_FILENAME_CHARS_PATTERN = re.compile(r'[^\w\s\-\.\(\)\+%,@\[\]{}:;!#$^&*=<>?\/]')
+INVALID_FILENAME_CHARS_PATTERN = re.compile(r"[^\w\s\-\.\(\)\+%,@\[\]{}:;!#$^&*=<>?\/]")
 
 
 class FlashForgeTcpClient:
     """
     Foundational TCP client for communicating with FlashForge 3D printers.
-    
+
     This class manages the socket connection, sending raw commands, handling responses,
     and maintaining a keep-alive connection. It serves as the base class for
     FlashForgeClient, which implements more specific G-code command logic.
-    
+
     The communication protocol typically involves sending ASCII G-code/M-code commands
     terminated by a newline character ('\\n') and receiving text-based responses,
     often ending with "ok" to indicate success.
@@ -34,9 +33,9 @@ class FlashForgeTcpClient:
     def __init__(self, hostname: str) -> None:
         """
         Create an instance of FlashForgeTcpClient.
-        
+
         Initializes the hostname and attempts to connect to the printer.
-        
+
         Args:
             hostname: The IP address or hostname of the FlashForge printer
         """
@@ -47,11 +46,11 @@ class FlashForgeTcpClient:
         self.timeout = 5.0
         """The default timeout (in seconds) for socket operations."""
 
-        self._reader: Optional[asyncio.StreamReader] = None
-        self._writer: Optional[asyncio.StreamWriter] = None
+        self._reader: asyncio.StreamReader | None = None
+        self._writer: asyncio.StreamWriter | None = None
         """The underlying network streams for TCP communication."""
 
-        self._keep_alive_task: Optional[asyncio.Task] = None
+        self._keep_alive_task: asyncio.Task | None = None
         """Task for the keep-alive mechanism."""
 
         self._keep_alive_cancellation_token = False
@@ -74,7 +73,7 @@ class FlashForgeTcpClient:
     async def start_keep_alive(self) -> None:
         """
         Start a keep-alive mechanism to maintain the TCP connection with the printer.
-        
+
         Periodically sends a status command (GCodes.CMD_PRINT_STATUS) to the printer.
         Adjusts the keep-alive interval based on error counts.
         This method runs asynchronously and will continue until stop_keep_alive is called
@@ -85,7 +84,7 @@ class FlashForgeTcpClient:
 
         self._keep_alive_cancellation_token = False
 
-        async def run_keep_alive():
+        async def run_keep_alive() -> None:
             try:
                 while not self._keep_alive_cancellation_token:
                     # logger.debug("KeepAlive")
@@ -97,7 +96,9 @@ class FlashForgeTcpClient:
                         break
 
                     if self._keep_alive_errors > 0:
-                        self._keep_alive_errors -= 1  # Move back to 0 errors with each "good" keep-alive
+                        self._keep_alive_errors -= (
+                            1  # Move back to 0 errors with each "good" keep-alive
+                        )
 
                     # Increase keep alive timeout based on error count
                     await asyncio.sleep(5.0 + self._keep_alive_errors * 1.0)
@@ -110,7 +111,7 @@ class FlashForgeTcpClient:
     async def stop_keep_alive(self, logout: bool = False) -> None:
         """
         Stop the keep-alive mechanism.
-        
+
         Args:
             logout: If True, sends a logout command to the printer before stopping
         """
@@ -131,17 +132,17 @@ class FlashForgeTcpClient:
 
         logger.info("Keep-alive stopped.")
 
-    async def send_command_async(self, cmd: str) -> Optional[str]:
+    async def send_command_async(self, cmd: str) -> str | None:
         """
         Send a command string to the printer asynchronously via the TCP socket.
-        
+
         It ensures the socket is available, writes the command (appending a newline),
         and then waits to receive a multi-line reply.
         Handles socket busy state and various connection errors.
-        
+
         Args:
             cmd: The command string to send (e.g., "~M115")
-            
+
         Returns:
             The printer's string reply, or None if an error occurs,
             the reply is invalid, or the connection needs to be reset
@@ -152,7 +153,11 @@ class FlashForgeTcpClient:
                 await self._check_socket()
 
                 # Write command
-                self._writer.write((cmd + '\n').encode('ascii'))
+                if self._writer is None:
+                    logger.error("Writer is None after _check_socket, cannot send command")
+                    return None
+
+                self._writer.write((cmd + "\n").encode("ascii"))
                 await self._writer.drain()
 
                 # Receive response
@@ -174,7 +179,7 @@ class FlashForgeTcpClient:
     async def _check_socket(self) -> None:
         """
         Check the status of the socket connection and attempt to reconnect if needed.
-        
+
         If reconnection occurs, it also restarts the keep-alive mechanism.
         """
         logger.debug("CheckSocket()")
@@ -197,14 +202,13 @@ class FlashForgeTcpClient:
     async def _connect(self) -> None:
         """
         Establish a TCP connection to the printer.
-        
+
         Initializes the reader and writer streams and sets up error handling.
         """
         # logger.debug("Connect()")
         try:
             self._reader, self._writer = await asyncio.wait_for(
-                asyncio.open_connection(self.hostname, self.port),
-                timeout=self.timeout
+                asyncio.open_connection(self.hostname, self.port), timeout=self.timeout
             )
         except Exception as error:
             logger.error(f"Failed to connect to {self.hostname}:{self.port}: {error}")
@@ -213,7 +217,7 @@ class FlashForgeTcpClient:
     async def _reset_socket(self) -> None:
         """
         Reset the current socket connection.
-        
+
         Stops the keep-alive mechanism and closes the connection.
         """
         # logger.debug("ResetSocket()")
@@ -227,18 +231,18 @@ class FlashForgeTcpClient:
         self._reader = None
         self._writer = None
 
-    async def _receive_multi_line_replay_async(self, cmd: str) -> Optional[str]:
+    async def _receive_multi_line_replay_async(self, cmd: str) -> str | None:
         """
         Asynchronously receive a multi-line reply from the printer for a given command.
-        
+
         It listens for data from the reader, concatenates incoming data,
         and determines when the full reply has been received based on command-specific delimiters
         (usually "ok" for text commands, or specific logic for binary data like thumbnails).
         Handles timeouts and errors during reception.
-        
+
         Args:
             cmd: The command string for which the reply is expected. This influences how completion is detected.
-            
+
         Returns:
             The complete string reply from the printer, or None if an error occurs,
             the reply is incomplete, or a timeout happens.
@@ -253,16 +257,15 @@ class FlashForgeTcpClient:
         answer = bytearray()
 
         # Set timeout based on command type
-        timeout_duration = 5.0  # default timeout
         if cmd == GCodes.CMD_LIST_LOCAL_FILES or cmd.startswith(GCodes.CMD_GET_THUMBNAIL):
-            timeout_duration = 10.0  # increase command timeout
+            pass  # increase command timeout
 
         try:
             while True:
                 # Read data with timeout
                 try:
                     data = await asyncio.wait_for(self._reader.read(4096), timeout=1.0)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Check if we have a complete response so far
                     if self._is_response_complete(cmd, answer):
                         break
@@ -281,20 +284,24 @@ class FlashForgeTcpClient:
                         await asyncio.sleep(0.5)
                         # Try to read any remaining data
                         try:
-                            additional_data = await asyncio.wait_for(self._reader.read(4096), timeout=0.1)
+                            additional_data = await asyncio.wait_for(
+                                self._reader.read(4096), timeout=0.1
+                            )
                             if additional_data:
                                 answer.extend(additional_data)
-                        except asyncio.TimeoutError:
+                        except TimeoutError:
                             pass
                     # For thumbnail requests, wait longer for binary data
                     elif cmd.startswith(GCodes.CMD_GET_THUMBNAIL):
                         await asyncio.sleep(1.5)
                         # Try to read any remaining binary data
                         try:
-                            additional_data = await asyncio.wait_for(self._reader.read(8192), timeout=0.5)
+                            additional_data = await asyncio.wait_for(
+                                self._reader.read(8192), timeout=0.5
+                            )
                             if additional_data:
                                 answer.extend(additional_data)
-                        except asyncio.TimeoutError:
+                        except TimeoutError:
                             pass
                     break
 
@@ -305,7 +312,7 @@ class FlashForgeTcpClient:
         # Convert response based on command type
         if cmd.startswith(GCodes.CMD_GET_THUMBNAIL):
             # For binary responses (M662), return as binary string
-            result = answer.decode('latin1')  # Preserve binary data
+            result = answer.decode("latin1")  # Preserve binary data
             if not result:
                 logger.error("Received empty thumbnail response.")
                 return None
@@ -313,10 +320,10 @@ class FlashForgeTcpClient:
         else:
             # For text responses, convert to UTF-8
             try:
-                result = answer.decode('utf-8')
+                result = answer.decode("utf-8")
             except UnicodeDecodeError:
                 # Fallback to latin1 if UTF-8 fails
-                result = answer.decode('latin1')
+                result = answer.decode("latin1")
 
             if not result:
                 logger.error("ReceiveMultiLineReplayAsync received an empty response.")
@@ -326,32 +333,32 @@ class FlashForgeTcpClient:
     def _is_response_complete(self, cmd: str, data: bytearray) -> bool:
         """
         Check if the response is complete based on the command type.
-        
+
         Args:
             cmd: The command that was sent
             data: The data received so far
-            
+
         Returns:
             True if the response appears complete, False otherwise
         """
         try:
             if cmd.startswith(GCodes.CMD_GET_THUMBNAIL):
                 # For binary responses, check for "ok" in the header only
-                header = data[:100].decode('ascii', errors='ignore')
+                header = data[:100].decode("ascii", errors="ignore")
                 return "ok" in header
             else:
                 # For text commands, check for "ok" in the full response
-                text = data.decode('utf-8', errors='ignore')
+                text = data.decode("utf-8", errors="ignore")
                 return "ok" in text
         except Exception:
             return False
 
-    async def get_file_list_async(self) -> List[str]:
+    async def get_file_list_async(self) -> list[str]:
         """
         Retrieve a list of G-code files stored on the printer's local storage.
-        
+
         Sends the CMD_LIST_LOCAL_FILES (M661) command and parses the response.
-        
+
         Returns:
             An array of file names (strings, without '/data/' prefix).
             Returns an empty array if the command fails or no files are found.
@@ -361,34 +368,34 @@ class FlashForgeTcpClient:
             return self._parse_file_list_response(response)
         return []
 
-    def _parse_file_list_response(self, response: str) -> List[str]:
+    def _parse_file_list_response(self, response: str) -> list[str]:
         """
         Parse the raw string response from the M661 (list files) command.
-        
+
         The response format typically includes segments separated by "::", with file paths
         prefixed by "/data/". This method extracts and cleans these file names.
-        
+
         Args:
             response: The raw string response from the M661 command
-            
+
         Returns:
             An array of file names, with the "/data/" prefix removed and any trailing invalid characters trimmed
         """
-        segments = response.split('::')
+        segments = response.split("::")
 
         # Extract file paths
         file_paths = []
         for segment in segments:
-            data_index = segment.find('/data/')
+            data_index = segment.find("/data/")
             if data_index != -1:
                 full_path = segment[data_index:]
-                if full_path.startswith('/data/'):
+                if full_path.startswith("/data/"):
                     filename = full_path[6:]  # Remove '/data/' prefix
 
                     # Trim at the first invalid character (if any)
                     match = INVALID_FILENAME_CHARS_PATTERN.search(filename)
                     if match:
-                        filename = filename[:match.start()]
+                        filename = filename[: match.start()]
 
                     # Only add non-empty filenames
                     if filename.strip():
@@ -399,7 +406,7 @@ class FlashForgeTcpClient:
     async def dispose(self) -> None:
         """
         Clean up resources by closing the socket connection.
-        
+
         This should be called when the client is no longer needed.
         """
         try:

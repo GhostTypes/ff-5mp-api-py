@@ -1,7 +1,8 @@
 """
 FlashForge Python API - Temperature Control Module
 """
-from typing import TYPE_CHECKING, Optional
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ...client import FlashForgeClient
@@ -17,12 +18,12 @@ class TempControl:
     def __init__(self, client: "FlashForgeClient"):
         """
         Creates an instance of the TempControl class.
-        
+
         Args:
             client: The FlashForgeClient instance used for communication with the printer.
         """
         self.client = client
-        self._tcp_client: Optional[TcpClient] = None
+        self._tcp_client: TcpClient | None = None
 
     @property
     def tcp_client(self) -> "TcpClient":
@@ -34,11 +35,11 @@ class TempControl:
     async def set_extruder_temp(self, temperature: int, wait_for: bool = False) -> bool:
         """
         Sets the target temperature for an extruder.
-        
+
         Args:
             temperature: The target temperature in Celsius.
             wait_for: Whether to wait for the heating operation to complete
-            
+
         Returns:
             True if the command is successful, False otherwise.
         """
@@ -47,11 +48,11 @@ class TempControl:
     async def set_bed_temp(self, temperature: int, wait_for: bool = False) -> bool:
         """
         Sets the target temperature for the print bed.
-        
+
         Args:
             temperature: The target bed temperature in Celsius.
             wait_for: Whether to wait for the heating operation to complete
-            
+
         Returns:
             True if the command is successful, False otherwise.
         """
@@ -69,20 +70,22 @@ class TempControl:
     async def cancel_bed_temp(self) -> bool:
         """
         Cancels the heating of the print bed (sets target temperature to 0).
-        
+
         Returns:
             True if the command is successful, False otherwise.
         """
         return await self.tcp_client.cancel_bed_temp()
 
-    async def wait_for_part_cool(self, target_temp: float = 50.0, timeout_seconds: int = 1800) -> bool:
+    async def wait_for_part_cool(
+        self, target_temp: float = 50.0, timeout_seconds: int = 1800
+    ) -> bool:
         """
         Waits for printer components to cool down to a safe temperature.
-        
+
         Args:
             target_temp: The target temperature to wait for (default: 50°C).
             timeout_seconds: Maximum time to wait in seconds (default: 30 minutes).
-            
+
         Returns:
             True if components cooled to target temperature, False if timeout or error.
         """

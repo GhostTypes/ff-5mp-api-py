@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class PrinterInfo:
     """
     Represents general information about the FlashForge 3D printer.
-    
+
     This information is typically parsed from the response of an M115 G-code command,
     which provides details about the printer's firmware and capabilities.
     """
@@ -42,13 +42,13 @@ class PrinterInfo:
         self.tool_count: str = ""
         """The number of tools (extruders) the printer has."""
 
-    def from_replay(self, replay: str) -> Optional['PrinterInfo']:
+    def from_replay(self, replay: str) -> Optional["PrinterInfo"]:
         """
         Parse a raw string replay from M115 command to populate printer info.
-        
+
         The M115 response is expected to be a multi-line string where each line
         provides a piece of information in a "Key: Value" format.
-        
+
         Expected format:
         - Line 1: Command echo/header (ignored)
         - Line 2: "Machine Type: [TypeName]"
@@ -58,10 +58,10 @@ class PrinterInfo:
         - Line 6: Dimensions string (e.g., "X:220 Y:220 Z:220")
         - Line 7: "Tool count: [ToolCount]"
         - Line 8: "Mac Address:[MacAddress]"
-        
+
         Args:
             replay: The raw multi-line string response from the M115 command
-            
+
         Returns:
             The populated PrinterInfo instance, or None if parsing fails
         """
@@ -69,7 +69,7 @@ class PrinterInfo:
             return None
 
         try:
-            data = replay.split('\n')
+            data = replay.split("\n")
 
             # Parse machine type (line 2)
             name = self._get_right(data[1])  # Expected: "Machine Type: Adventurer 5M Pro"
@@ -121,25 +121,25 @@ class PrinterInfo:
             logger.error(f"Error creating PrinterInfo instance from replay: {e}")
             return None
 
-    def _get_right(self, rp_data: str) -> Optional[str]:
+    def _get_right(self, rp_data: str) -> str | None:
         """
         Helper function to extract the value part of a "Key: Value" string.
-        
+
         Args:
             rp_data: The input string (e.g., "Machine Type: Adventurer 5M Pro")
-            
+
         Returns:
             The extracted value string (e.g., "Adventurer 5M Pro"), or None if parsing fails
         """
         try:
-            return rp_data.split(':', 1)[1].strip()
+            return rp_data.split(":", 1)[1].strip()
         except (IndexError, AttributeError):
             return None
 
     def __str__(self) -> str:
         """
         Return a string representation of the printer information.
-        
+
         Returns:
             A multi-line string detailing the printer's properties
         """

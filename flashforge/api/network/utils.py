@@ -1,7 +1,6 @@
 """
 FlashForge Python API - Network Utilities
 """
-from typing import Optional, Union
 
 from ...models.responses import GenericResponse
 
@@ -10,13 +9,13 @@ class NetworkUtils:
     """Utility class for handling network responses and status codes."""
 
     @staticmethod
-    def is_ok(response: Optional[Union[GenericResponse, dict]]) -> bool:
+    def is_ok(response: GenericResponse | dict | None) -> bool:
         """
         Checks if a response indicates success.
-        
+
         Args:
             response: The response object to check
-            
+
         Returns:
             True if the response indicates success, False otherwise
         """
@@ -34,13 +33,13 @@ class NetworkUtils:
         return code in (0, 200)
 
     @staticmethod
-    def get_error_message(response: Optional[Union[GenericResponse, dict]]) -> str:
+    def get_error_message(response: GenericResponse | dict | None) -> str:
         """
         Extracts error message from a response.
-        
+
         Args:
             response: The response object to extract message from
-            
+
         Returns:
             Error message string, or empty string if none found
         """
@@ -49,7 +48,7 @@ class NetworkUtils:
 
         # Handle dictionary responses
         if isinstance(response, dict):
-            return response.get("message", "Unknown error")
+            return str(response.get("message", "Unknown error"))
         else:
             # Handle GenericResponse objects
             return getattr(response, "message", "Unknown error")
