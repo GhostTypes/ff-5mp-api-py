@@ -22,6 +22,7 @@ The primary model for printer status, aggregating data from various sources into
 | `firmware_version` | `str` | Firmware version string |
 | `ip_address` | `str` | Printer IP address |
 | `mac_address` | `str` | MAC address |
+| `camera_stream_url` | `str` | OEM camera stream URL reported by the printer, or empty when inactive |
 
 #### Temperature Properties
 

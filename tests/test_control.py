@@ -35,6 +35,19 @@ async def test_set_led_on_with_led_control_enabled():
 
 
 @pytest.mark.asyncio
+async def test_set_led_on_returns_false_without_led_capability():
+    """set_led_on refuses to send commands when LED capability is unavailable."""
+    client = _build_client()
+    control = Control(client)
+    control.send_control_command = AsyncMock(return_value=True)
+
+    result = await control.set_led_on()
+
+    assert result is False
+    control.send_control_command.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_set_led_off():
     """set_led_off sends close payload."""
     client = _build_client()
@@ -47,6 +60,22 @@ async def test_set_led_off():
     assert result is True
     control.send_control_command.assert_awaited_once_with(
         Commands.LIGHT_CONTROL_CMD, {"status": "close"}
+    )
+
+
+@pytest.mark.asyncio
+async def test_set_led_on_uses_manual_override():
+    """set_led_on honors the explicit client override path for aftermarket LEDs."""
+    client = _build_client()
+    client.set_feature_overrides(led_control=True)
+    control = Control(client)
+    control.send_control_command = AsyncMock(return_value=True)
+
+    result = await control.set_led_on()
+
+    assert result is True
+    control.send_control_command.assert_awaited_once_with(
+        Commands.LIGHT_CONTROL_CMD, {"status": "open"}
     )
 
 
@@ -80,6 +109,34 @@ async def test_set_filtration_off():
     args = control._send_filtration_command.call_args.args[0]
     assert args.internal == "close"
     assert args.external == "close"
+
+
+@pytest.mark.asyncio
+async def test_turn_camera_on_requires_pro_model():
+    """turn_camera_on refuses to send commands when the client is not flagged as Pro."""
+    client = _build_client()
+    client.is_pro = False
+    control = Control(client)
+    control._send_camera_command = AsyncMock(return_value=True)
+
+    result = await control.turn_camera_on()
+
+    assert result is False
+    control._send_camera_command.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_turn_camera_on_sends_command_for_pro_models():
+    """turn_camera_on sends the command when the client is flagged as Pro."""
+    client = _build_client()
+    client.is_pro = True
+    control = Control(client)
+    control._send_camera_command = AsyncMock(return_value=True)
+
+    result = await control.turn_camera_on()
+
+    assert result is True
+    control._send_camera_command.assert_awaited_once_with(True)
 
 
 @pytest.mark.asyncio

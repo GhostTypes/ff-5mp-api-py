@@ -64,6 +64,7 @@ FlashForgeClient(ip_address: str, serial_number: str, check_code: str)
 - `is_pro: bool` - True if Pro model
 - `firmware_version: str` - Firmware version string
 - `mac_address: str` - MAC address
+- `camera_stream_url: str` - Runtime OEM camera stream URL reported by the printer
 - `led_control: bool` - True if LED control available
 - `filtration_control: bool` - True if filtration control available
 
@@ -148,6 +149,14 @@ General machine control operations.
 
 - `async set_filtration_off() -> bool`  
   Turns off all filtration systems.
+
+#### Camera Control
+
+- `async turn_camera_on() -> bool`  
+  Sends the OEM camera enable command for Pro models.
+
+- `async turn_camera_off() -> bool`  
+  Sends the OEM camera disable command for Pro models.
 
 #### Fan Control
 
@@ -411,6 +420,7 @@ Structured printer status and information.
 - `firmware_version: str` - Firmware version
 - `ip_address: str` - IP address
 - `mac_address: str` - MAC address
+- `camera_stream_url: str` - OEM camera stream URL, or empty when the printer is not reporting one
 - `print_file_name: str` - Current print file
 - `print_progress: float` - Print progress (0.0-100.0)
 - `current_print_layer: int` - Current layer number

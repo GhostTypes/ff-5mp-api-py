@@ -6,6 +6,7 @@ X, Y, Z coordinates of the printer's print head.
 """
 
 import logging
+import re
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -46,13 +47,25 @@ class LocationInfo:
             The populated LocationInfo instance, or None if parsing fails
         """
         try:
-            data = replay.split("\n")
-            # The first line (data[0]) is often the command echo (e.g., "ok M114") or similar,
-            # actual coordinate data is expected on the second line.
-            loc_data = data[1].split(" ")
-            self.x = loc_data[0].replace("X:", "").strip()
-            self.y = loc_data[1].replace("Y:", "").strip()
-            self.z = loc_data[2].replace("Z:", "").strip()
+            lines = [line.strip() for line in replay.replace("\r", "\n").split("\n") if line.strip()]
+            coordinate_line = next(
+                (line for line in lines if "X:" in line and "Y:" in line and "Z:" in line),
+                "",
+            )
+            if not coordinate_line:
+                logger.error("LocationInfo replay has bad/null data")
+                return None
+
+            x_match = re.search(r"X:\s*([^\s]+)", coordinate_line)
+            y_match = re.search(r"Y:\s*([^\s]+)", coordinate_line)
+            z_match = re.search(r"Z:\s*([^\s]+)", coordinate_line)
+            if not x_match or not y_match or not z_match:
+                logger.error("LocationInfo replay has bad/null data")
+                return None
+
+            self.x = x_match.group(1)
+            self.y = y_match.group(1)
+            self.z = z_match.group(1)
             return self
         except Exception:
             logger.error("LocationInfo replay has bad/null data")

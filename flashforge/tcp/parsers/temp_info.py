@@ -127,29 +127,24 @@ class TempInfo:
             return None
 
         try:
-            data = replay.split("\n")
-            if len(data) <= 1:
-                logger.error(f"TempInfo replay has invalid data: {data}")
+            lines = [line.strip() for line in replay.replace("\r", "\n").split("\n") if line.strip()]
+            if not lines:
+                logger.error("TempInfo replay has invalid data: %s", replay)
                 return None
 
-            # Relevant temperature data is usually on the second line (data[1])
-            # e.g., "T0:25/0 B:28/0 @:0 B@:0" or "T:210/210 B:60/60"
-            temp_data = data[1].split(" ")
             extruder_data_str = None
             bed_data_str = None
 
-            # Parse each temperature segment
-            for segment in temp_data:
-                # Check for extruder temperature (T0, T, or T) for some printers)
-                if segment.startswith("T0:"):
-                    extruder_data_str = segment.replace("T0:", "")
-                elif segment.startswith("T):"):  # Some printers might use T):
-                    extruder_data_str = segment.replace("T):", "")
-                elif segment.startswith("T:"):  # General case for T:
-                    extruder_data_str = segment.replace("T:", "")
-                # Check for bed temperature
-                elif segment.startswith("B:"):
-                    bed_data_str = segment.replace("B:", "")
+            for line in lines:
+                for segment in line.split(" "):
+                    if segment.startswith("T0:"):
+                        extruder_data_str = segment.replace("T0:", "")
+                    elif segment.startswith("T):"):
+                        extruder_data_str = segment.replace("T):", "")
+                    elif segment.startswith("T:"):
+                        extruder_data_str = segment.replace("T:", "")
+                    elif segment.startswith("B:"):
+                        bed_data_str = segment.replace("B:", "")
 
             # If we found extruder data, create TempData object
             if extruder_data_str:

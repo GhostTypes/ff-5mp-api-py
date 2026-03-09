@@ -178,28 +178,26 @@ class Control:
     async def set_led_on(self) -> bool:
         """
         Turns on the printer's LED lights.
-        Requires the printer to have LED control.
 
         Returns:
             True if the command is successful, False otherwise.
         """
-        if self.client.led_control:
-            return await self.send_control_command(Commands.LIGHT_CONTROL_CMD, {"status": "open"})
-        print("SetLedOn() error, LEDs not equipped.")
-        return False
+        if not self.client.led_control:
+            print("SetLedOn() error, LED control not equipped.")
+            return False
+        return await self.send_control_command(Commands.LIGHT_CONTROL_CMD, {"status": "open"})
 
     async def set_led_off(self) -> bool:
         """
         Turns off the printer's LED lights.
-        Requires the printer to have LED control.
 
         Returns:
             True if the command is successful, False otherwise.
         """
-        if self.client.led_control:
-            return await self.send_control_command(Commands.LIGHT_CONTROL_CMD, {"status": "close"})
-        print("SetLedOff() error, LEDs not equipped.")
-        return False
+        if not self.client.led_control:
+            print("SetLedOff() error, LED control not equipped.")
+            return False
+        return await self.send_control_command(Commands.LIGHT_CONTROL_CMD, {"status": "close"})
 
     async def turn_runout_sensor_on(self) -> bool:
         """

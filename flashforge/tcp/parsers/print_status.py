@@ -44,44 +44,31 @@ class PrintStatus:
             return None
 
         try:
-            data = replay.split("\n")
+            self.sd_current = ""
+            self.sd_total = ""
+            self.layer_current = ""
+            self.layer_total = ""
+            lines = [line.strip() for line in replay.replace("\r", "\n").split("\n") if line.strip()]
 
-            # Parse SD progress (line 1)
-            if len(data) > 1:
-                # Example: "SD printing byte 12345/67890"
-                sd_progress = data[1].replace("SD printing byte ", "").strip()
-                sd_progress_data = sd_progress.split("/")
-
-                if len(sd_progress_data) >= 2:
-                    self.sd_current = sd_progress_data[0].strip()
-                    self.sd_total = sd_progress_data[1].strip()
-                else:
-                    print("PrintStatus: Invalid SD progress format")
-                    return None
-
-            # Parse layer progress (line 2)
-            if len(data) > 2:
-                try:
-                    # Example: "Layer: 10/250"
-                    layer_progress = data[2].replace("Layer: ", "").strip()
-                except Exception:
-                    print("PrintStatus: Bad layer progress")
-                    print(f"Raw printer replay: {replay}")
-                    return None
-
-                try:
+            for line in lines:
+                if "SD printing byte " in line:
+                    sd_progress = line.split("SD printing byte ", 1)[1].strip().strip('"')
+                    sd_progress_data = sd_progress.split("/")
+                    if len(sd_progress_data) >= 2:
+                        self.sd_current = sd_progress_data[0].strip()
+                        self.sd_total = sd_progress_data[1].strip()
+                elif line.startswith("Layer:"):
+                    layer_progress = line.replace("Layer:", "", 1).strip()
                     lp_data = layer_progress.split("/")
                     if len(lp_data) >= 2:
                         self.layer_current = lp_data[0].strip()
                         self.layer_total = lp_data[1].strip()
                     else:
-                        print("PrintStatus: Invalid layer progress format")
-                        print(f"layerProgress: {layer_progress}")
                         return None
-                except Exception:
-                    print("PrintStatus: Bad layer progress parsing")
-                    print(f"layerProgress: {layer_progress}")
-                    return None
+
+            if not self.sd_current or not self.sd_total:
+                print("PrintStatus: Invalid SD progress format")
+                return None
 
             return self
 
@@ -109,7 +96,7 @@ class PrintStatus:
             return round(min(100, max(0, perc)))  # Clamp between 0 and 100
 
         except (ValueError, TypeError):
-            return float("nan")
+            return self.get_sd_percent()
 
     def get_layer_progress(self) -> str:
         """
@@ -161,7 +148,8 @@ class PrintStatus:
             total = int(self.layer_total)
             return current >= total and total > 0
         except (ValueError, TypeError):
-            return False
+            sd_percent = self.get_sd_percent()
+            return sd_percent == 100 if sd_percent == sd_percent else False
 
     def __str__(self) -> str:
         """String representation of the print status."""

@@ -363,5 +363,5 @@ class FFMachineInfo(BaseModel):
     def validate_print_progress(self) -> FFMachineInfo:
         """Ensure print progress integer matches float value."""
         if self.print_progress is not None:
-            self.print_progress_int = int(self.print_progress)
+            self.print_progress_int = max(0, min(100, int(self.print_progress * 100)))
         return self

@@ -2,12 +2,17 @@
 Low-level TCP client for communicating with FlashForge 3D printers.
 
 This module provides the foundational TCP communication layer, managing socket connections,
-sending raw commands, handling responses, and maintaining keep-alive connections.
+sending raw commands, handling responses, maintaining keep-alive connections, and supporting
+legacy raw-binary uploads used by Adventurer-class printers.
 """
+
+from __future__ import annotations
 
 import asyncio
 import logging
 import re
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
 
 from .gcode.gcodes import GCodes
 
@@ -17,109 +22,70 @@ logger = logging.getLogger(__name__)
 INVALID_FILENAME_CHARS_PATTERN = re.compile(r"[^\w\s\-\.\(\)\+%,@\[\]{}:;!#$^&*=<>?\/]")
 
 
+@dataclass(slots=True)
+class FlashForgeTcpClientOptions:
+    """Optional transport overrides for the TCP client."""
+
+    port: int | None = None
+
+
 class FlashForgeTcpClient:
     """
-    Foundational TCP client for communicating with FlashForge 3D printers.
+    Foundational TCP client for communicating with FlashForge printers.
 
-    This class manages the socket connection, sending raw commands, handling responses,
-    and maintaining a keep-alive connection. It serves as the base class for
-    FlashForgeClient, which implements more specific G-code command logic.
-
-    The communication protocol typically involves sending ASCII G-code/M-code commands
-    terminated by a newline character ('\\n') and receiving text-based responses,
-    often ending with "ok" to indicate success.
+    This class manages the socket connection, serializes commands over a single stream,
+    and handles protocol-specific response completion behavior such as the widened M661
+    settle window and legacy M28/M29 upload semantics.
     """
 
-    def __init__(self, hostname: str) -> None:
-        """
-        Create an instance of FlashForgeTcpClient.
-
-        Initializes the hostname and attempts to connect to the printer.
-
-        Args:
-            hostname: The IP address or hostname of the FlashForge printer
-        """
+    def __init__(self, hostname: str, options: FlashForgeTcpClientOptions | None = None) -> None:
         self.hostname = hostname
-        self.port = 8899
-        """The default TCP port used for connecting to FlashForge printers."""
-
+        self.port = options.port if options and options.port is not None else 8899
         self.timeout = 5.0
-        """The default timeout (in seconds) for socket operations."""
 
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
-        """The underlying network streams for TCP communication."""
-
-        self._keep_alive_task: asyncio.Task | None = None
-        """Task for the keep-alive mechanism."""
-
+        self._keep_alive_task: asyncio.Task[None] | None = None
         self._keep_alive_cancellation_token = False
-        """Token to signal cancellation of the keep-alive loop."""
-
         self._keep_alive_errors = 0
-        """Counter for consecutive keep-alive errors."""
-
         self._socket_lock = asyncio.Lock()
-        """Lock to ensure only one command is sent at a time."""
 
-        try:
-            logger.info("TcpPrinterClient creation")
-            # Note: We don't connect immediately in Python - connection is established on first use
-            logger.info("Initialized (connection will be established on first command)")
-        except Exception:
-            logger.error("TcpPrinterClient failed to init!")
-            raise
+        logger.info("TcpPrinterClient creation")
+        logger.info("Initialized (connection will be established on first command)")
 
     async def start_keep_alive(self) -> None:
-        """
-        Start a keep-alive mechanism to maintain the TCP connection with the printer.
-
-        Periodically sends a status command (GCodes.CMD_PRINT_STATUS) to the printer.
-        Adjusts the keep-alive interval based on error counts.
-        This method runs asynchronously and will continue until stop_keep_alive is called
-        or too many consecutive errors occur.
-        """
+        """Start the TCP keep-alive loop."""
         if self._keep_alive_task and not self._keep_alive_task.done():
-            return  # Already running
+            return
 
         self._keep_alive_cancellation_token = False
 
         async def run_keep_alive() -> None:
             try:
                 while not self._keep_alive_cancellation_token:
-                    # logger.debug("KeepAlive")
                     result = await self.send_command_async(GCodes.CMD_PRINT_STATUS)
                     if result is None:
-                        # Keep alive failed, connection error/timeout etc
-                        self._keep_alive_errors += 1  # Keep track of errors
-                        # logger.debug(f"Current keep alive failure: {self._keep_alive_errors}")
+                        self._keep_alive_errors += 1
                         break
 
                     if self._keep_alive_errors > 0:
-                        self._keep_alive_errors -= (
-                            1  # Move back to 0 errors with each "good" keep-alive
-                        )
+                        self._keep_alive_errors -= 1
 
-                    # Increase keep alive timeout based on error count
                     await asyncio.sleep(5.0 + self._keep_alive_errors * 1.0)
-
+            except asyncio.CancelledError:
+                raise
             except Exception as error:
-                logger.error(f"KeepAlive encountered an exception: {error}")
+                logger.error("KeepAlive encountered an exception: %s", error)
 
         self._keep_alive_task = asyncio.create_task(run_keep_alive())
 
     async def stop_keep_alive(self, logout: bool = False) -> None:
-        """
-        Stop the keep-alive mechanism.
-
-        Args:
-            logout: If True, sends a logout command to the printer before stopping
-        """
+        """Stop the keep-alive loop, optionally logging out first."""
         if logout:
             try:
-                await self.send_command_async(GCodes.CMD_LOGOUT)  # Release control
+                await self.send_command_async(GCodes.CMD_LOGOUT)
             except Exception:
-                pass  # Ignore errors during logout
+                pass
 
         self._keep_alive_cancellation_token = True
 
@@ -130,29 +96,21 @@ class FlashForgeTcpClient:
             except asyncio.CancelledError:
                 pass
 
+        self._keep_alive_task = None
         logger.info("Keep-alive stopped.")
 
     async def send_command_async(self, cmd: str) -> str | None:
         """
         Send a command string to the printer asynchronously via the TCP socket.
 
-        It ensures the socket is available, writes the command (appending a newline),
-        and then waits to receive a multi-line reply.
-        Handles socket busy state and various connection errors.
-
-        Args:
-            cmd: The command string to send (e.g., "~M115")
-
-        Returns:
-            The printer's string reply, or None if an error occurs,
-            the reply is invalid, or the connection needs to be reset
+        Commands are serialized over a single socket lock so the reader can safely
+        associate each response with the command that produced it.
         """
         async with self._socket_lock:
-            logger.debug(f"sendCommand: {cmd}")
+            logger.debug("sendCommand: %s", cmd)
             try:
                 await self._check_socket()
 
-                # Write command
                 if self._writer is None:
                     logger.error("Writer is None after _check_socket, cannot send command")
                     return None
@@ -160,67 +118,112 @@ class FlashForgeTcpClient:
                 self._writer.write((cmd + "\n").encode("ascii"))
                 await self._writer.drain()
 
-                # Receive response
+                if self.should_skip_response_wait(cmd):
+                    return ""
+
                 reply = await self._receive_multi_line_replay_async(cmd)
-
                 if reply is not None:
-                    # logger.debug(f"Received reply for command: {reply}")
                     return reply
-                else:
-                    logger.warning("Invalid or no reply received, resetting connection to printer.")
-                    await self._reset_socket()
-                    await self._check_socket()
-                    return None
 
-            except Exception as error:
-                logger.error(f"Error while sending command: {error}")
+                logger.warning("Invalid or no reply received, resetting connection to printer.")
+                await self._reset_socket()
+                await self._check_socket()
                 return None
 
-    async def _check_socket(self) -> None:
-        """
-        Check the status of the socket connection and attempt to reconnect if needed.
+            except Exception as error:
+                logger.error("Error while sending command: %s", error)
+                return None
 
-        If reconnection occurs, it also restarts the keep-alive mechanism.
+    async def upload_file(self, local_file_path: str, remote_file_name: str | None = None) -> bool:
         """
-        logger.debug("CheckSocket()")
+        Upload a file to legacy printer storage using the M28/raw-binary/M29 flow.
+        """
+        file_path = Path(local_file_path)
+        if not file_path.exists() or not file_path.is_file():
+            logger.error("Upload failed: %s is not a file.", local_file_path)
+            return False
+
+        normalized_file_name = self._normalize_legacy_upload_filename(
+            remote_file_name or local_file_path
+        )
+        if not normalized_file_name:
+            logger.error("Upload failed: remote file name resolved to an empty value.")
+            return False
+
+        start_command = (
+            GCodes.CMD_PREP_FILE_UPLOAD.replace("%%size%%", str(file_path.stat().st_size))
+            .replace("%%filename%%", normalized_file_name)
+        )
+
+        async with self._socket_lock:
+            try:
+                await self._check_socket()
+                if self._writer is None:
+                    logger.error("Upload failed: writer is unavailable.")
+                    return False
+
+                self._writer.write((start_command + "\n").encode("ascii"))
+                await self._writer.drain()
+
+                start_response = await self._receive_multi_line_replay_async(start_command)
+                if not start_response or not self._is_successful_upload_boundary_response(
+                    start_command, start_response
+                ):
+                    logger.error("Upload failed: printer rejected M28 upload initialization.")
+                    return False
+
+                with file_path.open("rb") as upload_stream:
+                    while chunk := upload_stream.read(64 * 1024):
+                        self._writer.write(chunk)
+                        await self._writer.drain()
+
+                self._writer.write((GCodes.CMD_COMPLETE_FILE_UPLOAD + "\n").encode("ascii"))
+                await self._writer.drain()
+
+                finish_response = await self._receive_multi_line_replay_async(
+                    GCodes.CMD_COMPLETE_FILE_UPLOAD
+                )
+                if not finish_response:
+                    logger.error("Upload failed: printer did not respond to M29 upload finalization.")
+                    return False
+
+                return self._is_successful_upload_boundary_response(
+                    GCodes.CMD_COMPLETE_FILE_UPLOAD, finish_response
+                )
+            except Exception as error:
+                logger.error("Upload failed for %s: %s", normalized_file_name, error)
+                await self._reset_socket()
+                return False
+
+    async def _check_socket(self) -> None:
+        """Reconnect the TCP socket if it is not ready."""
         fix = False
 
         if self._writer is None or self._reader is None:
             fix = True
-            # logger.debug("TcpPrinterClient socket is null")
         elif self._writer.is_closing():
             fix = True
-            # logger.debug("TcpPrinterClient socket is closed")
 
         if not fix:
             return
 
         logger.warning("Reconnecting to TCP socket...")
         await self._connect()
-        await self.start_keep_alive()  # Start this here rather than in Connect()
+        await self.start_keep_alive()
 
     async def _connect(self) -> None:
-        """
-        Establish a TCP connection to the printer.
-
-        Initializes the reader and writer streams and sets up error handling.
-        """
-        # logger.debug("Connect()")
+        """Establish a TCP connection to the printer."""
         try:
             self._reader, self._writer = await asyncio.wait_for(
-                asyncio.open_connection(self.hostname, self.port), timeout=self.timeout
+                asyncio.open_connection(self.hostname, self.port),
+                timeout=self.timeout,
             )
         except Exception as error:
-            logger.error(f"Failed to connect to {self.hostname}:{self.port}: {error}")
+            logger.error("Failed to connect to %s:%s: %s", self.hostname, self.port, error)
             raise
 
     async def _reset_socket(self) -> None:
-        """
-        Reset the current socket connection.
-
-        Stops the keep-alive mechanism and closes the connection.
-        """
-        # logger.debug("ResetSocket()")
+        """Reset the current socket connection."""
         await self.stop_keep_alive()
         if self._writer:
             self._writer.close()
@@ -232,186 +235,176 @@ class FlashForgeTcpClient:
         self._writer = None
 
     async def _receive_multi_line_replay_async(self, cmd: str) -> str | None:
-        """
-        Asynchronously receive a multi-line reply from the printer for a given command.
-
-        It listens for data from the reader, concatenates incoming data,
-        and determines when the full reply has been received based on command-specific delimiters
-        (usually "ok" for text commands, or specific logic for binary data like thumbnails).
-        Handles timeouts and errors during reception.
-
-        Args:
-            cmd: The command string for which the reply is expected. This influences how completion is detected.
-
-        Returns:
-            The complete string reply from the printer, or None if an error occurs,
-            the reply is incomplete, or a timeout happens.
-            For thumbnail commands (M662), the response is a binary string.
-        """
-        # logger.debug("ReceiveMultiLineReplayAsync()")
-
+        """Receive a complete multi-line reply for the given command."""
         if not self._reader:
-            # logger.error("Reader is null, cannot receive reply.")
             return None
 
         answer = bytearray()
+        loop = asyncio.get_running_loop()
+        start_time = loop.time()
+        last_data_time: float | None = None
+        completion_seen = False
+        is_binary = self.is_binary_command(cmd)
+        timeout_seconds = self.get_command_timeout_ms(cmd) / 1000.0
+        settle_delay_seconds = self.get_response_completion_delay_ms(cmd, is_binary) / 1000.0
+        inactivity_delay_seconds = self.get_inactivity_completion_delay_ms(cmd) / 1000.0
 
-        # Set timeout based on command type
-        if cmd == GCodes.CMD_LIST_LOCAL_FILES or cmd.startswith(GCodes.CMD_GET_THUMBNAIL):
-            pass  # increase command timeout
+        while True:
+            elapsed = loop.time() - start_time
+            remaining_timeout = timeout_seconds - elapsed
+            if remaining_timeout <= 0:
+                logger.error(
+                    "ReceiveMultiLineReplayAsync timed out after %sms",
+                    self.get_command_timeout_ms(cmd),
+                )
+                return None
 
-        try:
-            while True:
-                # Read data with timeout
-                try:
-                    data = await asyncio.wait_for(self._reader.read(4096), timeout=1.0)
-                except TimeoutError:
-                    # Check if we have a complete response so far
-                    if self._is_response_complete(cmd, answer):
-                        break
-                    continue
+            read_timeout = min(0.1, remaining_timeout) if answer else min(1.0, remaining_timeout)
 
-                if not data:
-                    logger.error("Connection closed by remote host")
-                    return None
-
-                answer.extend(data)
-
-                # Check for completion
-                if self._is_response_complete(cmd, answer):
-                    # For file list command, wait a bit more for all data
-                    if cmd == GCodes.CMD_LIST_LOCAL_FILES:
-                        await asyncio.sleep(0.5)
-                        # Try to read any remaining data
-                        try:
-                            additional_data = await asyncio.wait_for(
-                                self._reader.read(4096), timeout=0.1
-                            )
-                            if additional_data:
-                                answer.extend(additional_data)
-                        except TimeoutError:
-                            pass
-                    # For thumbnail requests, wait longer for binary data
-                    elif cmd.startswith(GCodes.CMD_GET_THUMBNAIL):
-                        await asyncio.sleep(1.5)
-                        # Try to read any remaining binary data
-                        try:
-                            additional_data = await asyncio.wait_for(
-                                self._reader.read(8192), timeout=0.5
-                            )
-                            if additional_data:
-                                answer.extend(additional_data)
-                        except TimeoutError:
-                            pass
+            try:
+                data = await asyncio.wait_for(self._reader.read(8192), timeout=read_timeout)
+            except TimeoutError:
+                now = loop.time()
+                if completion_seen and (
+                    settle_delay_seconds == 0
+                    or (last_data_time is not None and now - last_data_time >= settle_delay_seconds)
+                ):
                     break
 
-        except Exception as e:
-            logger.error(f"Error receiving multi-line command reply: {e}")
-            return None
+                if (
+                    answer
+                    and self.should_use_inactivity_completion(cmd)
+                    and last_data_time is not None
+                    and now - last_data_time >= inactivity_delay_seconds
+                ):
+                    break
+                continue
 
-        # Convert response based on command type
-        if cmd.startswith(GCodes.CMD_GET_THUMBNAIL):
-            # For binary responses (M662), return as binary string
-            result = answer.decode("latin1")  # Preserve binary data
+            if not data:
+                logger.error("Connection closed by remote host")
+                return None
+
+            answer.extend(data)
+            last_data_time = loop.time()
+
+            if is_binary:
+                if self.is_binary_response_complete(cmd, answer):
+                    if settle_delay_seconds == 0:
+                        break
+                    completion_seen = True
+                continue
+
+            text_so_far = answer.decode("utf-8", errors="ignore")
+            if self.is_text_response_complete(cmd, text_so_far):
+                if settle_delay_seconds == 0:
+                    break
+                completion_seen = True
+
+        if is_binary:
+            result = answer.decode("latin1")
             if not result:
-                logger.error("Received empty thumbnail response.")
+                logger.error("Received empty binary response.")
                 return None
             return result
-        else:
-            # For text responses, convert to UTF-8
-            try:
-                result = answer.decode("utf-8")
-            except UnicodeDecodeError:
-                # Fallback to latin1 if UTF-8 fails
-                result = answer.decode("latin1")
 
-            if not result:
-                logger.error("ReceiveMultiLineReplayAsync received an empty response.")
-                return None
-            return result
-
-    def _is_response_complete(self, cmd: str, data: bytearray) -> bool:
-        """
-        Check if the response is complete based on the command type.
-
-        Args:
-            cmd: The command that was sent
-            data: The data received so far
-
-        Returns:
-            True if the response appears complete, False otherwise
-        """
         try:
-            if cmd.startswith(GCodes.CMD_GET_THUMBNAIL):
-                # For binary responses, check for "ok" in the header only
-                header = data[:100].decode("ascii", errors="ignore")
-                return "ok" in header
-            else:
-                # For text commands, check for "ok" in the full response
-                text = data.decode("utf-8", errors="ignore")
-                return "ok" in text
+            result = self.normalize_text_response(cmd, answer.decode("utf-8"))
+        except UnicodeDecodeError:
+            result = self.normalize_text_response(cmd, answer.decode("latin1"))
+
+        if not result:
+            logger.error("ReceiveMultiLineReplayAsync received an empty response.")
+            return None
+        return result
+
+    def should_skip_response_wait(self, _cmd: str) -> bool:
+        """Determine whether a command should return as soon as it is written."""
+        return False
+
+    def is_binary_command(self, cmd: str) -> bool:
+        """Determine whether a command returns binary payload data."""
+        return cmd.startswith(GCodes.CMD_GET_THUMBNAIL)
+
+    def is_text_response_complete(self, _cmd: str, response: str) -> bool:
+        """Determine when a text response is complete."""
+        return "ok" in response
+
+    def should_use_inactivity_completion(self, cmd: str) -> bool:
+        """Determine whether a command should complete after a quiet period."""
+        return self._is_legacy_upload_boundary_command(cmd)
+
+    def get_inactivity_completion_delay_ms(self, cmd: str) -> int:
+        """Delay used for inactivity-based completion."""
+        if self._is_legacy_upload_boundary_command(cmd):
+            return 250
+        return 200
+
+    def get_response_completion_delay_ms(self, cmd: str, binary: bool) -> int:
+        """Delay added after the completion marker is seen to allow trailing data to arrive."""
+        if binary:
+            return 1500
+        if cmd == GCodes.CMD_LIST_LOCAL_FILES:
+            return 1200
+        return 0
+
+    def is_binary_response_complete(self, _cmd: str, response: bytearray) -> bool:
+        """Determine whether a binary response buffer is complete."""
+        try:
+            header = bytes(response[:100]).decode("ascii", errors="ignore")
+            return "ok" in header
         except Exception:
             return False
 
+    def normalize_text_response(self, _cmd: str, response: str) -> str:
+        """Normalize text responses before returning them to callers."""
+        return response
+
+    def get_command_timeout_ms(self, cmd: str) -> int:
+        """Return the socket timeout to use for a given command."""
+        if cmd == GCodes.CMD_LIST_LOCAL_FILES or self.is_binary_command(cmd):
+            return 10000
+        if self._is_legacy_upload_boundary_command(cmd):
+            return 10000
+        if cmd == GCodes.CMD_HOME_AXES or cmd == "~G28":
+            return 15000
+        return 5000
+
     async def get_file_list_async(self) -> list[str]:
-        """
-        Retrieve a list of G-code files stored on the printer's local storage.
-
-        Sends the CMD_LIST_LOCAL_FILES (M661) command and parses the response.
-
-        Returns:
-            An array of file names (strings, without '/data/' prefix).
-            Returns an empty array if the command fails or no files are found.
-        """
+        """Retrieve a list of G-code files stored on the printer."""
         response = await self.send_command_async(GCodes.CMD_LIST_LOCAL_FILES)
         if response:
             return self._parse_file_list_response(response)
         return []
 
     def _parse_file_list_response(self, response: str) -> list[str]:
-        """
-        Parse the raw string response from the M661 (list files) command.
-
-        The response format typically includes segments separated by "::", with file paths
-        prefixed by "/data/". This method extracts and cleans these file names.
-
-        Args:
-            response: The raw string response from the M661 command
-
-        Returns:
-            An array of file names, with the "/data/" prefix removed and any trailing invalid characters trimmed
-        """
+        """Parse the raw string response from the M661 list-files command."""
         segments = response.split("::")
+        file_paths: list[str] = []
 
-        # Extract file paths
-        file_paths = []
         for segment in segments:
             data_index = segment.find("/data/")
-            if data_index != -1:
-                full_path = segment[data_index:]
-                if full_path.startswith("/data/"):
-                    filename = full_path[6:]  # Remove '/data/' prefix
+            if data_index == -1:
+                continue
 
-                    # Trim at the first invalid character (if any)
-                    match = INVALID_FILENAME_CHARS_PATTERN.search(filename)
-                    if match:
-                        filename = filename[: match.start()]
+            full_path = segment[data_index:]
+            if not full_path.startswith("/data/"):
+                continue
 
-                    # Only add non-empty filenames
-                    if filename.strip():
-                        file_paths.append(filename)
+            filename = full_path[6:]
+            match = INVALID_FILENAME_CHARS_PATTERN.search(filename)
+            if match:
+                filename = filename[: match.start()]
+
+            if filename.strip():
+                file_paths.append(filename)
 
         return file_paths
 
     async def dispose(self) -> None:
-        """
-        Clean up resources by closing the socket connection.
-
-        This should be called when the client is no longer needed.
-        """
+        """Clean up resources by closing the socket connection."""
         try:
             logger.info("TcpPrinterClient closing socket")
-            await self.stop_keep_alive(logout=True)  # Stop keep-alive timer and send logout command
+            await self.stop_keep_alive(logout=True)
             if self._writer:
                 self._writer.close()
                 try:
@@ -421,4 +414,38 @@ class FlashForgeTcpClient:
             self._reader = None
             self._writer = None
         except Exception as error:
-            logger.error(f"Error during dispose: {error}")
+            logger.error("Error during dispose: %s", error)
+
+    def _normalize_legacy_upload_filename(self, file_name: str) -> str:
+        normalized_path = file_name.replace("\\", "/")
+        without_legacy_prefix = re.sub(r"^0:/user/", "", normalized_path, flags=re.IGNORECASE)
+        without_legacy_prefix = re.sub(
+            r"^/data/",
+            "",
+            without_legacy_prefix,
+            flags=re.IGNORECASE,
+        )
+        return PurePosixPath(without_legacy_prefix).name
+
+    def _is_legacy_upload_boundary_command(self, cmd: str) -> bool:
+        return bool(re.match(r"^~?M(28|29)\b", cmd.strip(), flags=re.IGNORECASE))
+
+    def _is_successful_upload_boundary_response(self, cmd: str, response: str) -> bool:
+        normalized = response.replace("\r\n", "\n").strip()
+        if not normalized:
+            return False
+
+        if re.search(
+            r"error:|control failed\.|file is not available|cannot create file|not enough space",
+            normalized,
+            flags=re.IGNORECASE,
+        ):
+            return False
+
+        bare_command = cmd.strip().removeprefix("~").split(maxsplit=1)[0]
+        return (
+            "ok" in normalized
+            or "Received." in normalized
+            or re.search(rf"\b{re.escape(bare_command)}\b", normalized, flags=re.IGNORECASE)
+            is not None
+        )

@@ -4,16 +4,21 @@ Unit tests for the main FlashForgeClient class.
 
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from flashforge.client import FlashForgeClient, MachineInfoParser
+from flashforge.client import (
+    FiveMClientConnectionOptions,
+    FlashForgeClient,
+    MachineInfoParser,
+)
 from flashforge.models import FFMachineInfo
 from flashforge.models.responses import DetailResponse
 from tests.fixtures.printer_responses import (
     AD5X_INFO_RESPONSE,
     FIVE_M_PRO_INFO_RESPONSE,
+    PRODUCT_RESPONSE,
 )
 
 
@@ -23,6 +28,20 @@ def _build_machine_info(payload: dict) -> FFMachineInfo:
     machine_info = MachineInfoParser.from_detail(detail_response.detail)
     assert machine_info is not None  # Guard against malformed fixture
     return machine_info
+
+
+def _mock_http_session(response_payload: dict, status: int = 200) -> MagicMock:
+    mock_response = MagicMock()
+    mock_response.status = status
+    mock_response.json = AsyncMock(return_value=response_payload)
+
+    mock_post_ctx = MagicMock()
+    mock_post_ctx.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_post_ctx.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = MagicMock()
+    mock_session.post = MagicMock(return_value=mock_post_ctx)
+    return mock_session
 
 
 @pytest.mark.asyncio
@@ -109,7 +128,79 @@ def test_cache_details_all_fields_5m_pro():
     assert client.cache_details(machine_info) is True
     assert client.printer_name == "Adventurer 5M Pro"
     assert client.is_ad5x is False
-    assert client.is_pro is False  # cache_details does not change is_pro flag
+    assert client.is_pro is True
+
+
+def test_cache_details_stores_camera_stream_url():
+    """cache_details stores the runtime camera stream URL reported by the printer."""
+    client = FlashForgeClient("192.168.1.140", "SN555", "CODE555")
+    payload = {
+        **FIVE_M_PRO_INFO_RESPONSE,
+        "detail": {
+            **FIVE_M_PRO_INFO_RESPONSE["detail"],
+            "cameraStreamUrl": "http://192.168.1.140:8080/?action=stream",
+        },
+    }
+    machine_info = _build_machine_info(payload)
+
+    assert client.cache_details(machine_info) is True
+    assert client.camera_stream_url == "http://192.168.1.140:8080/?action=stream"
+
+
+def test_constructor_supports_connection_overrides():
+    """Constructor applies HTTP/TCP overrides and optional LED availability override."""
+    client = FlashForgeClient(
+        "192.168.1.10",
+        "SN-1",
+        "CHK-1",
+        options=FiveMClientConnectionOptions(
+            http_port=19098,
+            tcp_port=19099,
+            led_control_override=True,
+        ),
+    )
+
+    assert client.get_endpoint("/detail") == "http://192.168.1.10:19098/detail"
+    assert client.tcp_client.port == 19099
+    assert client.led_control is True
+
+
+@pytest.mark.asyncio
+async def test_send_product_command_stores_product_info_and_control_states():
+    """send_product_command caches product info and detected feature flags."""
+    client = FlashForgeClient("192.168.1.120", "SN123", "CODE123")
+    client._ensure_http_session = AsyncMock(return_value=_mock_http_session(PRODUCT_RESPONSE))
+
+    result = await client.send_product_command()
+
+    assert result is True
+    assert client.product_info is not None
+    assert client.product_info.lightCtrlState == 1
+    assert client.led_control is True
+    assert client.filtration_control is True
+
+
+@pytest.mark.asyncio
+async def test_led_override_round_trip_restores_detected_product_state():
+    """Manual LED override is additive and can be cleared back to detected product state."""
+    client = FlashForgeClient("192.168.1.120", "SN123", "CODE123")
+    response_payload = {
+        "code": 0,
+        "product": {
+            **PRODUCT_RESPONSE["product"],
+            "lightCtrlState": 0,
+        },
+    }
+    client._ensure_http_session = AsyncMock(return_value=_mock_http_session(response_payload))
+
+    assert await client.send_product_command() is True
+    assert client.led_control is False
+
+    client.set_feature_overrides(led_control=True)
+    assert client.led_control is True
+
+    client.set_feature_overrides(led_control=None)
+    assert client.led_control is False
 
 
 @pytest.mark.asyncio

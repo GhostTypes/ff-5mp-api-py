@@ -64,6 +64,12 @@ class GCodes:
     CMD_GET_THUMBNAIL: Final[str] = "~M662"
     """Command to retrieve a thumbnail image for a specified G-code file."""
 
+    CMD_PREP_FILE_UPLOAD: Final[str] = "~M28 %%size%% 0:/user/%%filename%%"
+    """Command to begin a legacy raw-binary file upload to printer storage."""
+
+    CMD_COMPLETE_FILE_UPLOAD: Final[str] = "~M29"
+    """Command to finalize a legacy raw-binary file upload."""
+
     # Camera control
     TAKE_PICTURE: Final[str] = "~M240"
     """Command to instruct the printer to take a picture with its camera, if equipped."""

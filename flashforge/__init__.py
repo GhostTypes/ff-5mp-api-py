@@ -51,12 +51,23 @@ from .api.network.fnet_code import FNetCode
 
 # Import utility classes
 from .api.network.utils import NetworkUtils
-from .client import FlashForgeClient
+from .client import FiveMClientConnectionOptions, FlashForgeClient
 
 # Import discovery classes
 from .discovery import (
+    DiscoveredPrinter,
+    DiscoveryError,
+    DiscoveryMonitor,
+    DiscoveryOptions,
+    DiscoveryProtocol,
+    DiscoveryTimeoutError,
     FlashForgePrinter,
     FlashForgePrinterDiscovery,
+    InvalidResponseError,
+    PrinterDiscovery,
+    PrinterModel,
+    PrinterStatus,
+    SocketCreationError,
 )
 
 # Import key models for convenience
@@ -83,9 +94,16 @@ from .models import (
     ThumbnailResponse,
 )
 from .tcp import (
+    A3BuildVolume,
+    A3FileEntry,
+    A3GCodeController,
+    A3PrinterInfo,
+    A3Thumbnail,
     Endstop,
     EndstopStatus,
+    FlashForgeA3Client,
     FlashForgeTcpClient,
+    FlashForgeTcpClientOptions,
     GCodeController,
     GCodes,
     LocationInfo,
@@ -104,7 +122,8 @@ from .tcp import (
     FlashForgeTcpClient as TcpClient,
 )
 
-__version__ = "1.0.0"
+FiveMClient = FlashForgeClient
+__version__ = "1.1.0"
 __author__ = "FlashForge Python API Contributors"
 __email__ = "notghosttypes@gmail.com"
 __description__ = "Python library for controlling FlashForge 3D printers"
@@ -113,6 +132,8 @@ __description__ = "Python library for controlling FlashForge 3D printers"
 __all__ = [
     # Main client class
     "FlashForgeClient",
+    "FiveMClient",
+    "FiveMClientConnectionOptions",
     # Data models
     "FFMachineInfo",
     "FFPrinterDetail",
@@ -144,6 +165,8 @@ __all__ = [
     # TCP classes for low-level operations
     "TcpClient",
     "FlashForgeTcpClient",
+    "FlashForgeTcpClientOptions",
+    "FlashForgeA3Client",
     "PrinterInfo",
     "TempInfo",
     "TempData",
@@ -157,7 +180,23 @@ __all__ = [
     "ThumbnailInfo",
     "GCodes",
     "GCodeController",
+    "A3GCodeController",
+    "A3BuildVolume",
+    "A3PrinterInfo",
+    "A3FileEntry",
+    "A3Thumbnail",
     # Discovery classes
+    "PrinterDiscovery",
+    "DiscoveredPrinter",
+    "DiscoveryOptions",
+    "PrinterModel",
+    "DiscoveryProtocol",
+    "PrinterStatus",
+    "DiscoveryMonitor",
+    "DiscoveryError",
+    "InvalidResponseError",
+    "SocketCreationError",
+    "DiscoveryTimeoutError",
     "FlashForgePrinter",
     "FlashForgePrinterDiscovery",
     # Utilities
@@ -176,7 +215,7 @@ __all__ = [
 ]
 
 # Convenience imports for common patterns
-from .models.machine_info import MachineState as State
+State = MachineState
 
 # Add version info accessible as flashforge.version
 version = __version__

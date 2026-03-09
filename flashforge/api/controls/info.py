@@ -2,6 +2,7 @@
 FlashForge Python API - Info Module
 """
 
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 import aiohttp
@@ -37,42 +38,13 @@ class MachineInfoParser:
             return None
 
         try:
-            # Helper function to format time from seconds
-            def format_time_from_seconds(seconds: float) -> str:
-                try:
-                    valid_seconds = int(seconds) if isinstance(seconds, (int, float)) else 0
-                    hours = valid_seconds // 3600
-                    minutes = (valid_seconds % 3600) // 60
-                    return f"{hours:02d}:{minutes:02d}"
-                except Exception:
-                    return "00:00"
-
-            # Helper function to get machine state
-            def get_machine_state(status: str) -> MachineState:
-                valid_status = status.lower() if isinstance(status, str) else ""
-                state_mapping = {
-                    "ready": MachineState.READY,
-                    "busy": MachineState.BUSY,
-                    "calibrate_doing": MachineState.CALIBRATING,
-                    "error": MachineState.ERROR,
-                    "heating": MachineState.HEATING,
-                    "printing": MachineState.PRINTING,
-                    "pausing": MachineState.PAUSING,
-                    "paused": MachineState.PAUSED,
-                    "cancel": MachineState.CANCELLED,
-                    "completed": MachineState.COMPLETED,
-                }
-
-                if valid_status in state_mapping:
-                    return state_mapping[valid_status]
-
-                if valid_status:
-                    print(f"Unknown machine status received: '{status}'")
-                return MachineState.UNKNOWN
-
             # Calculate derived values
-            print_eta = format_time_from_seconds(getattr(detail, "estimated_time", 0) or 0)
-            formatted_run_time = format_time_from_seconds(getattr(detail, "print_duration", 0) or 0)
+            estimated_time = getattr(detail, "estimated_time", 0) or 0
+            print_eta = MachineInfoParser._format_time_from_seconds(estimated_time)
+            formatted_run_time = MachineInfoParser._format_time_from_seconds(
+                getattr(detail, "print_duration", 0) or 0
+            )
+            completion_time = datetime.now() + timedelta(seconds=estimated_time)
 
             total_minutes = getattr(detail, "cumulative_print_time", 0) or 0
             hours = total_minutes // 60
@@ -91,6 +63,14 @@ class MachineInfoParser:
             print_progress = getattr(detail, "print_progress", 0) or 0
             est_length = total_job_filament_meters * print_progress
             est_weight = (getattr(detail, "estimated_right_weight", 0) or 0) * print_progress
+            has_material_station = (
+                getattr(detail, "has_matl_station", None) is True
+                or (getattr(getattr(detail, "matl_station_info", None), "slot_cnt", 0) or 0) > 0
+                or len(getattr(getattr(detail, "matl_station_info", None), "slot_infos", []) or []) > 0
+            )
+            printer_name = getattr(detail, "name", "") or ""
+            is_ad5x = printer_name.upper() == "AD5X" or has_material_station
+            is_pro = "Pro" in printer_name and not is_ad5x
 
             # Build the FFMachineInfo object
             machine_info = FFMachineInfo(
@@ -127,9 +107,9 @@ class MachineInfoParser:
                 # Print settings
                 fill_amount=getattr(detail, "fill_amount", 0) or 0,
                 firmware_version=getattr(detail, "firmware_version", "") or "",
-                name=getattr(detail, "name", "") or "",
-                is_pro="Pro" in (getattr(detail, "name", "") or ""),
-                is_ad5x="AD5X" in (getattr(detail, "name", "") or "").upper(),
+                name=printer_name,
+                is_pro=is_pro,
+                is_ad5x=is_ad5x,
                 nozzle_size=getattr(detail, "nozzle_model", "") or "",
                 # Temperatures
                 print_bed=Temperature(
@@ -150,7 +130,7 @@ class MachineInfoParser:
                 print_speed_adjust=getattr(detail, "print_speed_adjust", 0) or 0,
                 filament_type=getattr(detail, "right_filament_type", "") or "",
                 # Machine state
-                machine_state=get_machine_state(getattr(detail, "status", "") or ""),
+                machine_state=MachineInfoParser._get_machine_state(getattr(detail, "status", "") or ""),
                 status=getattr(detail, "status", "") or "",
                 total_print_layers=getattr(detail, "target_print_layer", 0) or 0,
                 tvoc=getattr(detail, "tvoc", 0) or 0,
@@ -160,6 +140,7 @@ class MachineInfoParser:
                 polar_cloud_register_code=getattr(detail, "polar_register_code", "") or "",
                 # Extras
                 print_eta=print_eta,
+                completion_time=completion_time,
                 formatted_run_time=formatted_run_time,
                 formatted_total_run_time=formatted_total_run_time,
                 # AD5X Material Station
@@ -174,6 +155,41 @@ class MachineInfoParser:
             print(f"Error in MachineInfoParser.from_detail: {error}")
             print(f"Detail object causing error: {detail}")
             return None
+
+    @staticmethod
+    def _format_time_from_seconds(seconds: float) -> str:
+        """Format a duration in seconds as HH:MM."""
+        try:
+            valid_seconds = int(seconds) if isinstance(seconds, (int, float)) else 0
+            hours = valid_seconds // 3600
+            minutes = (valid_seconds % 3600) // 60
+            return f"{hours:02d}:{minutes:02d}"
+        except Exception:
+            return "00:00"
+
+    @staticmethod
+    def _get_machine_state(status: str) -> MachineState:
+        """Map raw status strings into the public machine state enum."""
+        valid_status = status.lower() if isinstance(status, str) else ""
+        state_mapping = {
+            "ready": MachineState.READY,
+            "busy": MachineState.BUSY,
+            "calibrate_doing": MachineState.CALIBRATING,
+            "error": MachineState.ERROR,
+            "heating": MachineState.HEATING,
+            "printing": MachineState.PRINTING,
+            "pausing": MachineState.PAUSING,
+            "paused": MachineState.PAUSED,
+            "cancel": MachineState.CANCELLED,
+            "completed": MachineState.COMPLETED,
+        }
+
+        if valid_status in state_mapping:
+            return state_mapping[valid_status]
+
+        if valid_status:
+            print(f"Unknown machine status received: '{status}'")
+        return MachineState.UNKNOWN
 
 
 class Info:

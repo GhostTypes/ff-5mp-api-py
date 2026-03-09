@@ -9,7 +9,7 @@ from enum import Enum
 from typing import Optional
 
 # Pre-compiled regex to match key:value pairs where value is an integer
-KV_PATTERN = re.compile(r"([A-Za-z0-9-]+):(\d+)")
+KV_PATTERN = re.compile(r"([A-Za-z0-9-]+):\s*(\d+)")
 
 
 class MachineStatus(Enum):
@@ -90,6 +90,7 @@ class EndstopStatus:
         self.machine_status: MachineStatus = MachineStatus.DEFAULT
         self.move_mode: MoveMode = MoveMode.DEFAULT
         self.status: Status | None = None
+        self.filament_status: str = ""
         self.led_enabled: bool = False
         self.current_file: str | None = None
 
@@ -117,72 +118,66 @@ class EndstopStatus:
             return None
 
         try:
-            data = replay.split("\n")
-
-            # Validate that we have enough lines for a valid response
-            # A valid M119 response should have at least 2 lines (command echo + endstop data)
-            if len(data) < 2:
+            lines = [line.strip() for line in replay.replace("\r", "\n").split("\n") if line.strip()]
+            if not lines:
                 return None
 
-            # Check if the data looks like a valid M119 response
-            # Should contain "Endstop" in the second line
-            if len(data) > 1 and "Endstop" not in data[1]:
+            endstop_line = next((line for line in lines if "Endstop" in line), None)
+            if endstop_line is None:
                 return None
 
-            # Parse endstop data (line 1)
-            if len(data) > 1:
-                self.endstop = Endstop(data[1])
+            self.endstop = Endstop(endstop_line)
 
-            # Parse machine status (line 2)
-            if len(data) > 2:
-                machine_status = data[2].replace("MachineStatus: ", "").strip()
-                if "BUILDING_FROM_SD" in machine_status:
-                    self.machine_status = MachineStatus.BUILDING_FROM_SD
-                elif "BUILDING_COMPLETED" in machine_status:
-                    self.machine_status = MachineStatus.BUILDING_COMPLETED
-                elif "PAUSED" in machine_status:
-                    self.machine_status = MachineStatus.PAUSED
-                elif "READY" in machine_status:
-                    self.machine_status = MachineStatus.READY
-                elif "BUSY" in machine_status:
-                    self.machine_status = MachineStatus.BUSY
-                else:
-                    print(f"EndstopStatus: Encountered unknown MachineStatus: {machine_status}")
-                    self.machine_status = MachineStatus.DEFAULT
-
-            # Parse move mode (line 3)
-            if len(data) > 3:
-                move_mode = data[3].replace("MoveMode: ", "").strip()
-                if "MOVING" in move_mode:
-                    self.move_mode = MoveMode.MOVING
-                elif "PAUSED" in move_mode:
-                    self.move_mode = MoveMode.PAUSED
-                elif "READY" in move_mode:
-                    self.move_mode = MoveMode.READY
-                elif "WAIT_ON_TOOL" in move_mode:
-                    self.move_mode = MoveMode.WAIT_ON_TOOL
-                elif "HOMING" in move_mode:
-                    self.move_mode = MoveMode.HOMING
-                else:
-                    print(f"EndstopStatus: Encountered unknown MoveMode: {move_mode}")
-                    self.move_mode = MoveMode.DEFAULT
-
-            # Parse status flags (line 4)
-            if len(data) > 4:
-                self.status = Status(data[4])
-
-            # Parse LED status (line 5)
-            if len(data) > 5:
-                led_str = data[5].replace("LED: ", "").strip()
-                try:
-                    self.led_enabled = int(led_str) == 1
-                except ValueError:
-                    self.led_enabled = False
-
-            # Parse current file (line 6)
-            if len(data) > 6:
-                current_file = data[6].replace("CurrentFile: ", "").strip()
-                self.current_file = current_file if current_file else None
+            for line in lines:
+                if line.startswith("MachineStatus:"):
+                    machine_status = line.replace("MachineStatus:", "", 1).strip().upper()
+                    if "BUILDING_FROM_SD" in machine_status:
+                        self.machine_status = MachineStatus.BUILDING_FROM_SD
+                    elif "BUILDING_COMPLETED" in machine_status:
+                        self.machine_status = MachineStatus.BUILDING_COMPLETED
+                    elif "PAUSED" in machine_status:
+                        self.machine_status = MachineStatus.PAUSED
+                    elif "READY" in machine_status or "IDLE" in machine_status:
+                        self.machine_status = MachineStatus.READY
+                    elif "BUSY" in machine_status:
+                        self.machine_status = MachineStatus.BUSY
+                    else:
+                        print(f"EndstopStatus: Encountered unknown MachineStatus: {machine_status}")
+                        self.machine_status = MachineStatus.DEFAULT
+                elif line.startswith("MoveMode:"):
+                    move_mode = line.replace("MoveMode:", "", 1).strip().upper()
+                    if "MOVING" in move_mode:
+                        self.move_mode = MoveMode.MOVING
+                    elif "PAUSED" in move_mode:
+                        self.move_mode = MoveMode.PAUSED
+                    elif "READY" in move_mode or move_mode in {"0", "0.0"}:
+                        self.move_mode = MoveMode.READY
+                    elif "WAIT_ON_TOOL" in move_mode:
+                        self.move_mode = MoveMode.WAIT_ON_TOOL
+                    elif "HOMING" in move_mode:
+                        self.move_mode = MoveMode.HOMING
+                    else:
+                        print(f"EndstopStatus: Encountered unknown MoveMode: {move_mode}")
+                        self.move_mode = MoveMode.DEFAULT
+                elif line.startswith("Status "):
+                    self.status = Status(line)
+                elif line.startswith("FilamentStatus:"):
+                    self.filament_status = line.replace("FilamentStatus:", "", 1).strip()
+                elif line.startswith("LEDStatus:"):
+                    led_status = line.replace("LEDStatus:", "", 1).strip().lower()
+                    self.led_enabled = led_status == "on"
+                elif line.startswith("LED:"):
+                    led_str = line.replace("LED:", "", 1).strip()
+                    try:
+                        self.led_enabled = int(led_str) == 1
+                    except ValueError:
+                        self.led_enabled = False
+                elif line.startswith("CurrentFile:"):
+                    current_file = line.replace("CurrentFile:", "", 1).strip()
+                    self.current_file = current_file if current_file else None
+                elif line.startswith("PrintFileName:"):
+                    current_file = line.replace("PrintFileName:", "", 1).strip()
+                    self.current_file = current_file if current_file else None
 
             return self
 

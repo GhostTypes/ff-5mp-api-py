@@ -4,7 +4,6 @@ Tests for NetworkUtils class.
 These tests validate the utility methods used for handling network responses.
 """
 
-import pytest
 
 from flashforge.api.network.utils import NetworkUtils
 from flashforge.models.responses import GenericResponse

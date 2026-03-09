@@ -28,7 +28,7 @@
 | **File Operations** | List, upload, and download files • Extract print thumbnails • File metadata retrieval |
 | **Async Architecture** | Native async/await implementation • Non-blocking network operations • Concurrent operations support |
 | **Type Safety** | Full type hints for IDE autocomplete • Pydantic models for data validation • mypy strict mode compatible |
-| **Model Detection** | Automatic capability detection • Feature flags for model-specific functions • Graceful degradation for older models |
+| **Model Detection** | Automatic capability detection • Runtime camera stream detection via `camera_stream_url` • Graceful degradation for older models |
 
 </div>
 
@@ -154,6 +154,31 @@ async def monitor_printer():
         print(f"Layer Progress: {layer_p}% (Layer {current_layer})")
 
 asyncio.run(monitor_printer())
+```
+
+### Camera Stream Detection
+
+Use the printer-reported runtime camera stream URL as the OEM camera source of truth:
+
+```python
+from flashforge import FlashForgeClient
+import asyncio
+
+async def check_camera():
+    async with FlashForgeClient("192.168.1.100", "SERIAL", "CODE") as client:
+        if not await client.initialize():
+            return
+
+        if client.camera_stream_url:
+            print(f"OEM camera stream: {client.camera_stream_url}")
+        else:
+            print("Printer is not reporting an active OEM camera stream")
+
+        # Camera power control remains Pro-only.
+        if client.is_pro:
+            await client.control.turn_camera_on()
+
+asyncio.run(check_camera())
 ```
 
 ### File Operations and Thumbnails

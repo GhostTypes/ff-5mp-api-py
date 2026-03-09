@@ -6,6 +6,7 @@ like model, firmware version, serial number, and capabilities.
 """
 
 import logging
+import re
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -69,51 +70,40 @@ class PrinterInfo:
             return None
 
         try:
-            data = replay.split("\n")
+            lines = [line.strip() for line in replay.replace("\r", "\n").split("\n") if line.strip()]
 
-            # Parse machine type (line 2)
-            name = self._get_right(data[1])  # Expected: "Machine Type: Adventurer 5M Pro"
-            if name is None:
+            for line in lines:
+                if line.startswith("Machine Type:"):
+                    self.type_name = line.replace("Machine Type:", "", 1).strip()
+                elif line.startswith("Machine Name:"):
+                    self.name = line.replace("Machine Name:", "", 1).strip()
+                elif line.startswith("Firmware:"):
+                    self.firmware_version = line.replace("Firmware:", "", 1).strip()
+                elif line.startswith("SN:"):
+                    self.serial_number = line.replace("SN:", "", 1).strip()
+                elif line.startswith("Serial Number:"):
+                    self.serial_number = line.replace("Serial Number:", "", 1).strip()
+                elif line.startswith("Tool count:") or line.startswith("Tool Count:"):
+                    tool_count = self._get_right(line)
+                    if tool_count is not None:
+                        self.tool_count = tool_count
+                elif line.startswith("Mac Address:"):
+                    self.mac_address = line.replace("Mac Address:", "", 1).strip()
+                elif re.search(r"X:\s*\d+.*Y:\s*\d+.*Z:\s*\d+", line, re.IGNORECASE):
+                    self.dimensions = line
+
+            if not self.type_name:
                 logger.error("PrinterInfo replay has null Machine Type")
                 return None
-            self.type_name = name
-
-            # Parse machine name (line 3)
-            nick = self._get_right(data[2])  # Expected: "Machine Name: MyPrinter"
-            if nick is None:
+            if not self.name:
                 logger.error("PrinterInfo replay has null Machine Name")
                 return None
-            self.name = nick
-
-            # Parse firmware version (line 4)
-            fw = self._get_right(data[3])  # Expected: "Firmware: V1.2.3"
-            if fw is None:
+            if not self.firmware_version:
                 logger.error("PrinterInfo replay has null firmware version")
                 return None
-            self.firmware_version = fw
-
-            # Parse serial number (line 5)
-            sn = self._get_right(data[4])  # Expected: "SN: SN12345"
-            if sn is None:
+            if not self.serial_number:
                 logger.error("PrinterInfo replay has null serial number")
                 return None
-            self.serial_number = sn
-
-            # Parse dimensions (line 6) - direct string
-            if len(data) > 5:
-                self.dimensions = data[5].strip()  # Expected: "X:220 Y:220 Z:220"
-
-            # Parse tool count (line 7)
-            if len(data) > 6:
-                tcs = self._get_right(data[6])  # Expected: "Tool count: 1"
-                if tcs is None:
-                    logger.error("PrinterInfo replay has null tool count")
-                    return None
-                self.tool_count = tcs
-
-            # Parse MAC address (line 8)
-            if len(data) > 7:
-                self.mac_address = data[7].replace("Mac Address:", "").strip()
 
             return self
 

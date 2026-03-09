@@ -46,6 +46,21 @@ class ThumbnailInfo:
         try:
             # Store the file name
             self._file_name = file_name
+            if "Error: File not exists" in replay:
+                return None
+
+            binary_buffer = replay.encode("latin1")
+            magic_marker = b"\xA2\xA2\x2A\x2A"
+            magic_offset = binary_buffer.find(magic_marker)
+            if magic_offset >= 0 and len(binary_buffer) >= magic_offset + 8:
+                payload_length = int.from_bytes(
+                    binary_buffer[magic_offset + 4 : magic_offset + 8],
+                    byteorder="big",
+                )
+                payload_end = magic_offset + 8 + payload_length
+                if len(binary_buffer) >= payload_end:
+                    self._image_data = binary_buffer[magic_offset + 8 : payload_end]
+                    return self
 
             # Find where the PNG data starts (after the "ok" text delimiter)
             ok_index = replay.find("ok")

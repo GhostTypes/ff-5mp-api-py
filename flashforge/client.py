@@ -6,6 +6,7 @@ communication layers for controlling FlashForge 3D printers.
 """
 
 import asyncio
+from dataclasses import dataclass
 
 import aiohttp
 
@@ -13,10 +14,19 @@ from .api.constants.endpoints import Endpoints
 from .api.controls import Control, Files, Info, JobControl, TempControl
 from .api.controls.info import MachineInfoParser
 from .api.network.utils import NetworkUtils
-from .models import FFMachineInfo, ProductResponse
+from .models import FFMachineInfo, Product, ProductResponse
 from .tcp import FlashForgeClient as TcpClient
-from .tcp import PrinterInfo
+from .tcp import FlashForgeTcpClientOptions, PrinterInfo
 from .tcp.parsers.temp_info import TempInfo
+
+
+@dataclass(slots=True)
+class FiveMClientConnectionOptions:
+    """Optional connection and feature overrides for FiveMClient-compatible clients."""
+
+    http_port: int | None = None
+    tcp_port: int | None = None
+    led_control_override: bool | None = None
 
 
 class FlashForgeClient:
@@ -28,7 +38,13 @@ class FlashForgeClient:
     HTTP and TCP communication layers to provide a unified interface.
     """
 
-    def __init__(self, ip_address: str, serial_number: str, check_code: str):
+    def __init__(
+        self,
+        ip_address: str,
+        serial_number: str,
+        check_code: str,
+        options: FiveMClientConnectionOptions | None = None,
+    ):
         """
         Creates an instance of FlashForgeClient.
 
@@ -43,7 +59,7 @@ class FlashForgeClient:
         self.check_code = check_code
 
         # Constants
-        self._PORT = 8898
+        self._PORT = options.http_port if options and options.http_port is not None else 8898
         self._HTTP_TIMEOUT = 5.0
 
         # HTTP client state
@@ -52,7 +68,10 @@ class FlashForgeClient:
         self._http_client_event.set()  # Not busy initially
 
         # TCP client setup
-        self.tcp_client = TcpClient(ip_address)
+        tcp_options = None
+        if options and options.tcp_port is not None:
+            tcp_options = FlashForgeTcpClientOptions(port=options.tcp_port)
+        self.tcp_client = TcpClient(ip_address, tcp_options)
 
         # Control instances
         self.control = Control(self)
@@ -70,12 +89,22 @@ class FlashForgeClient:
         self.mac_address: str = ""
         self.flash_cloud_code: str = ""
         self.polar_cloud_code: str = ""
+        self.camera_stream_url: str = ""
         self.lifetime_print_time: str = ""
         self.lifetime_filament_meters: str = ""
+        self.product_info: Product | None = None
 
         # Control states
         self.led_control: bool = False
         self.filtration_control: bool = False
+        self._detected_led_control: bool = False
+        self._detected_filtration_control: bool = False
+        self._led_control_override = (
+            options.led_control_override
+            if options and options.led_control_override is not None
+            else None
+        )
+        self._apply_feature_overrides()
 
     @property
     def is_ad5x(self) -> bool:
@@ -190,6 +219,8 @@ class FlashForgeClient:
         if self._http_session and not self._http_session.closed:
             await self._http_session.close()
 
+        self.camera_stream_url = ""
+
     def cache_details(self, info: FFMachineInfo | None) -> bool:
         """
         Caches machine details from the provided FFMachineInfo object.
@@ -205,17 +236,20 @@ class FlashForgeClient:
 
         # Cache all printer information
         self.printer_name = info.name or ""
+        self.is_pro = info.is_pro
         self.firmware_version = info.firmware_version or ""
         self.firmware_ver = info.firmware_version.split("-")[0] if info.firmware_version else ""
         self.mac_address = info.mac_address or ""
         self.flash_cloud_code = info.flash_cloud_register_code or ""
         self.polar_cloud_code = info.polar_cloud_register_code or ""
+        self.camera_stream_url = info.camera_stream_url or ""
         self.lifetime_print_time = info.formatted_total_run_time or ""
         self._is_ad5x = info.is_ad5x
 
         # Format filament usage
         filament_value = info.cumulative_filament if info.cumulative_filament is not None else 0.0
         self.lifetime_filament_meters = f"{filament_value:.2f}m"
+        self._apply_feature_overrides()
 
         return True
 
@@ -254,7 +288,7 @@ class FlashForgeClient:
             # Get TCP printer information to check for Pro model
             tcp_info: PrinterInfo | None = await self.tcp_client.get_printer_info()
             if tcp_info:
-                if "Pro" in tcp_info.type_name:
+                if "Pro" in tcp_info.type_name and not machine_info.is_pro and not machine_info.is_ad5x:
                     self.is_pro = True
             else:
                 print(
@@ -311,10 +345,12 @@ class FlashForgeClient:
                 product_response = ProductResponse(**data)
                 if product_response and product_response.product:
                     product = product_response.product
-                    self.led_control = product.lightCtrlState != 0
-                    self.filtration_control = not (
+                    self.product_info = product
+                    self._detected_led_control = product.lightCtrlState != 0
+                    self._detected_filtration_control = not (
                         product.internalFanCtrlState == 0 or product.externalFanCtrlState == 0
                     )
+                    self._apply_feature_overrides()
                     return True
 
         except Exception as error:
@@ -389,6 +425,20 @@ class FlashForgeClient:
             True if successful, False otherwise
         """
         return await self.job_control.resume_print_job()
+
+    def set_feature_overrides(self, *, led_control: bool | None = None) -> None:
+        """Apply manual feature overrides for integrations that need UI-level capability control."""
+        self._led_control_override = led_control
+        self._apply_feature_overrides()
+
+    def _apply_feature_overrides(self) -> None:
+        """Apply any configured manual capability overrides to the cached client state."""
+        self.led_control = (
+            self._led_control_override
+            if self._led_control_override is not None
+            else self._detected_led_control
+        )
+        self.filtration_control = self._detected_filtration_control
 
     def __repr__(self) -> str:
         """String representation of the client."""

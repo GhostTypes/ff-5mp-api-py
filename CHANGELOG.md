@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-03-08
+
+### Added
+- `FlashForgeA3Client` — full Adventurer 3 TCP client with dedicated G-code protocol support
+- `A3GCodeController` — A3-specific G-code command controller
+- `FlashForgeClient.camera_stream_url` — caches the OEM camera stream URL reported by the printer in machine-info responses
+- `thumbnail_info` parser for handling printer thumbnail responses
+- New G-code commands in `gcodes.py` for broader printer compatibility
+- Test coverage for A3 client, camera stream URL caching, and machine-info model parity
+- mypy exclude configuration for tests and examples
+
+### Changed
+- Major refactor of `discovery.py` for improved reliability and cross-printer compatibility
+- `tcp_client.py` substantially reworked for better connection handling and parser coverage
+- Parsers (`endstop_status`, `location_info`, `print_status`, `printer_info`, `temp_info`) updated for improved type safety and correctness
+- `client.py` extended with camera stream URL caching from machine-info responses
+- `control.py` updated with refined API surface
+- `info.py` refactored for cleaner response handling
+- Ruff linter configuration updated to use `[tool.ruff.lint]` table (ruff >=0.1.0 syntax)
+- Package exports in `__init__.py` updated to include new A3 types and client
+- TCP module exports updated to expose A3 client and controller
+
+### Fixed
+- Discovery reliability improvements from `discovery.py` refactor
+- TCP client parser edge cases addressed across all response types
+
 ## [1.0.2] - 2025-12-26
 
 ### Added

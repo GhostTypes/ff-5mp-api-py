@@ -7,14 +7,22 @@ the basic TCP communication provided by FlashForgeTcpClient.
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from .gcodes import GCodes
 
 if TYPE_CHECKING:
-    from ..ff_client import FlashForgeClient
+    from ..parsers.temp_info import TempInfo
 
 logger = logging.getLogger(__name__)
+
+
+class SupportsGCodeClient(Protocol):
+    """Client protocol implemented by both the legacy and Adventurer 3 TCP clients."""
+
+    async def send_cmd_ok(self, cmd: str) -> bool: ...
+
+    async def get_temp_info(self) -> "TempInfo | None": ...
 
 
 class GCodeController:
@@ -25,7 +33,7 @@ class GCodeController:
     like LED control, job management, movement, and temperature control.
     """
 
-    def __init__(self, client: "FlashForgeClient") -> None:
+    def __init__(self, client: SupportsGCodeClient) -> None:
         """
         Initialize the G-code controller.
 

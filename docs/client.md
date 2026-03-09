@@ -103,6 +103,22 @@ async with FlashForgeClient(ip, serial, check_code) as client:
     await client.job_control.cancel_print_job()
 ```
 
+#### Detect OEM Camera Stream
+
+```python
+async with FlashForgeClient(ip, serial, check_code) as client:
+    await client.initialize()
+
+    if client.camera_stream_url:
+        print(f"OEM camera stream: {client.camera_stream_url}")
+    else:
+        print("No active OEM camera stream reported by the printer")
+
+    # Camera power control remains Pro-only.
+    if client.is_pro:
+        await client.control.turn_camera_on()
+```
+
 #### List Files
 
 ```python

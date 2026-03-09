@@ -10,7 +10,7 @@ import logging
 
 from .gcode import GCodeController, GCodes
 from .parsers import EndstopStatus, LocationInfo, PrinterInfo, PrintStatus, TempInfo, ThumbnailInfo
-from .tcp_client import FlashForgeTcpClient
+from .tcp_client import FlashForgeTcpClient, FlashForgeTcpClientOptions
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +27,14 @@ class FlashForgeClient(FlashForgeTcpClient):
     and parsing text-based responses.
     """
 
-    def __init__(self, hostname: str) -> None:
+    def __init__(self, hostname: str, options: FlashForgeTcpClientOptions | None = None) -> None:
         """
         Create an instance of FlashForgeClient.
 
         Args:
             hostname: The IP address or hostname of the FlashForge printer
         """
-        super().__init__(hostname)
+        super().__init__(hostname, options)
         self._control = GCodeController(self)
         self._is_5m_pro = False
         """Flag indicating if the connected printer is a 5M Pro model, which may have specific features."""
@@ -403,7 +403,7 @@ class FlashForgeClient(FlashForgeTcpClient):
         Returns:
             An EndstopStatus object, or None if retrieval fails
         """
-        response = await self.send_command_async(GCodes.CMD_INFO_STATUS)  # M119
+        response = await self.send_command_async(GCodes.CMD_ENDSTOP_INFO)
         if response:
             return EndstopStatus().from_replay(response)
         return None
