@@ -1,5 +1,7 @@
 # Protocols
 
+This page describes the underlying protocols used by the Python client. For recommended public entry points, see [client.md](client.md). For cross-language expectations, see [parity.md](parity.md).
+
 FlashForge printers use a hybrid communication strategy with TCP, HTTP, and UDP protocols. Understanding these protocols is helpful for debugging and advanced usage.
 
 ## TCP Protocol
@@ -102,7 +104,7 @@ Commands are sent via POST with JSON payloads:
 ```json
 {
   "serialNumber": "SN123456",
-  "checkCode": "",
+  "checkCode": "CHECK_CODE",
   "payload": {
     "cmd": "control",
     "args": {
@@ -132,7 +134,7 @@ Responses include a status code and data:
 Simple authentication using serial number and check code:
 
 - **Serial Number**: Required for all HTTP requests
-- **Check Code**: Usually empty for local network control
+- **Check Code**: Required for modern LAN-mode HTTP control
 - **Purpose**: Identifies the printer and authorizes commands
 
 ### HTTP Client Usage
@@ -182,15 +184,19 @@ IP: 192.168.1.100
 ### Discovery Usage
 
 ```python
-from flashforge import FlashForgePrinterDiscovery
+from flashforge import PrinterDiscovery, DiscoveryOptions
 
-discovery = FlashForgePrinterDiscovery()
-printers = await discovery.discover_printers_async(
-    timeout_ms=3000,        # Total timeout
-    idle_timeout_ms=1000,   # Idle timeout
-    max_retries=3           # Retry attempts
+discovery = PrinterDiscovery()
+printers = await discovery.discover(
+    DiscoveryOptions(
+        timeout=3000,
+        idle_timeout=1000,
+        max_retries=3,
+    )
 )
 ```
+
+`FlashForgePrinterDiscovery` is still exported as a compatibility wrapper for older Python callers, but `PrinterDiscovery` is the preferred modern API.
 
 ### Discovery Limitations
 

@@ -2,6 +2,8 @@
 
 This document provides a comprehensive reference for the FlashForge Python API, including all classes, methods, and data models.
 
+For recommended modern entry points, use `FlashForgeClient` and `PrinterDiscovery`. `FlashForgePrinterDiscovery` remains available as a compatibility wrapper.
+
 ## Core Client
 
 ### `flashforge.FlashForgeClient`
@@ -90,9 +92,18 @@ async with FlashForgeClient(ip, serial, check_code) as client:
 
 ## Discovery
 
+### `flashforge.PrinterDiscovery`
+
+Typed UDP discovery API for modern and legacy FlashForge models.
+
+#### Methods
+
+- `async discover(options: DiscoveryOptions | None = None) -> list[DiscoveredPrinter]`
+- `monitor(options: DiscoveryOptions | None = None) -> DiscoveryMonitor`
+
 ### `flashforge.FlashForgePrinterDiscovery`
 
-Handles UDP-based printer discovery on the local network.
+Backward-compatible wrapper around `PrinterDiscovery`.
 
 #### Methods
 
@@ -545,10 +556,10 @@ async with FlashForgeClient("192.168.1.100", "SERIAL", "CHECK_CODE") as client:
 ### Discovery
 
 ```python
-from flashforge import FlashForgePrinterDiscovery
+from flashforge import PrinterDiscovery
 
-discovery = FlashForgePrinterDiscovery()
-printers = await discovery.discover_printers_async()
+discovery = PrinterDiscovery()
+printers = await discovery.discover()
 
 for printer in printers:
     print(f"{printer.name} at {printer.ip_address}")

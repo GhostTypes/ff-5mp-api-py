@@ -1,5 +1,7 @@
 # Advanced Topics
 
+This page documents advanced Python usage patterns. If you are comparing this library with the TypeScript API, read [parity.md](parity.md) first.
+
 ## Async/Await Patterns
 
 The FlashForge API is fully asynchronous, leveraging Python's `asyncio` library. All network operations are non-blocking, ensuring your application remains responsive while communicating with the printer.
@@ -278,18 +280,20 @@ async with client:
 
 **Finding your credentials:**
 
-The serial number and check code are printer-specific. Use the discovery method first to automatically retrieve these values:
+The serial number and check code are printer-specific. For new code, prefer the modern `PrinterDiscovery` API:
 
 ```python
-from flashforge import FlashForgePrinterDiscovery
+from flashforge import PrinterDiscovery
 
-discovery = FlashForgePrinterDiscovery()
-printers = await discovery.discover_printers_async()
+discovery = PrinterDiscovery()
+printers = await discovery.discover()
 
 for printer in printers:
     print(f"IP: {printer.ip_address}")
     print(f"Serial: {printer.serial_number}")
 ```
+
+If you need compatibility with older Python callers, `FlashForgePrinterDiscovery` is still exported as a reduced wrapper.
 
 ## Type Hints & Safety
 
