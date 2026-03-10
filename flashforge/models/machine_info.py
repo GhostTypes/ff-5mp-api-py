@@ -199,20 +199,23 @@ class FFPrinterDetail(BaseModel):
     of boolean states (e.g., "open", "close").
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
     auto_shutdown: str | None = Field(default=None, alias="autoShutdown")
     auto_shutdown_time: int | None = Field(default=None, ge=0, alias="autoShutdownTime")
+    camera: int | None = Field(default=None, ge=0, alias="camera")
     camera_stream_url: str | None = Field(default=None, alias="cameraStreamUrl")
     chamber_fan_speed: int | None = Field(default=None, ge=0, le=100, alias="chamberFanSpeed")
     chamber_target_temp: float | None = Field(
         default=None, ge=-50, le=500, alias="chamberTargetTemp"
     )
     chamber_temp: float | None = Field(default=None, ge=-50, le=500, alias="chamberTemp")
+    clear_fan_status: str | None = Field(default=None, alias="clearFanStatus")
     cooling_fan_speed: int | None = Field(default=None, ge=0, le=100, alias="coolingFanSpeed")
     cooling_fan_left_speed: int | None = Field(
         default=None, ge=0, le=100, alias="coolingFanLeftSpeed"
     )
+    coordinate: list[float] | None = Field(default=None, alias="coordinate")
     cumulative_filament: float | None = Field(default=None, ge=0, alias="cumulativeFilament")
     cumulative_print_time: int | None = Field(default=None, ge=0, alias="cumulativePrintTime")
     current_print_speed: int | None = Field(default=None, ge=0, le=200, alias="currentPrintSpeed")
@@ -223,6 +226,7 @@ class FFPrinterDetail(BaseModel):
     estimated_right_len: float | None = Field(default=None, ge=0, alias="estimatedRightLen")
     estimated_right_weight: float | None = Field(default=None, ge=0, alias="estimatedRightWeight")
     estimated_time: float | None = Field(default=None, ge=0, alias="estimatedTime")
+    extrude_ctrl: int | None = Field(default=None, ge=0, alias="extrudeCtrl")
     external_fan_status: str | None = Field(default=None, alias="externalFanStatus")
     fill_amount: float | None = Field(default=None, ge=0, le=100, alias="fillAmount")
     firmware_version: str | None = Field(default=None, alias="firmwareVersion")
@@ -241,6 +245,7 @@ class FFPrinterDetail(BaseModel):
     location: str | None = Field(default=None, alias="location")
     mac_addr: str | None = Field(default=None, alias="macAddr")
     measure: str | None = Field(default=None, alias="measure")
+    move_ctrl: int | None = Field(default=None, ge=0, alias="moveCtrl")
     name: str | None = Field(default=None, alias="name")
     nozzle_cnt: int | None = Field(default=None, ge=1, le=4, alias="nozzleCnt")
     nozzle_model: str | None = Field(default=None, alias="nozzleModel")

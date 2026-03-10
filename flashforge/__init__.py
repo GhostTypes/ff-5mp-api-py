@@ -123,7 +123,7 @@ from .tcp import (
 )
 
 FiveMClient = FlashForgeClient
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 __author__ = "FlashForge Python API Contributors"
 __email__ = "notghosttypes@gmail.com"
 __description__ = "Python library for controlling FlashForge 3D printers"

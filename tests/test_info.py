@@ -69,6 +69,30 @@ async def test_get_info_success_5m_pro():
 
 
 @pytest.mark.asyncio
+async def test_get_info_accepts_extended_ad5x_detail_fields():
+    """AD5X detail parsing should tolerate newer firmware capability fields."""
+    info = _build_info()
+    payload = json.loads(json.dumps(AD5X_INFO_RESPONSE))
+    payload["detail"].update(
+        {
+            "camera": 1,
+            "clearFanStatus": "open",
+            "coordinate": [10000.0, 10000.0, 10000.0],
+            "extrudeCtrl": 1,
+            "moveCtrl": 1,
+            "unexpectedFutureField": {"value": 1},
+        }
+    )
+    detail_response = DetailResponse(**payload)
+    info.get_detail_response = AsyncMock(return_value=detail_response)
+
+    machine_info = await info.get()
+
+    assert machine_info is not None
+    assert machine_info.is_ad5x is True
+
+
+@pytest.mark.asyncio
 async def test_is_printing_true():
     """is_printing returns True when status printing."""
     info = _build_info()
