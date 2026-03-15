@@ -187,10 +187,23 @@ def test_parse_legacy_protocol_parses_adventurer_4():
     assert result.event_port is None
 
 
+def test_parse_legacy_protocol_parses_adventurer_4_lite():
+    """Legacy 140-byte payloads should detect Adventurer 4 Lite by PID fallback."""
+    discovery = PrinterDiscovery()
+    result = discovery.parse_legacy_protocol(
+        _build_legacy_buffer(name="Adventurer 4 Lite", product_id=0x0016),
+        "192.168.1.201",
+    )
+
+    assert result.model == PrinterModel.ADVENTURER_4
+    assert result.product_id == 0x0016
+
+
 def test_detect_legacy_model_uses_product_id_fallback():
     """Legacy PID fallback covers renamed Adventurer 3 and Adventurer 4 printers."""
     discovery = PrinterDiscovery()
 
+    assert discovery.detect_legacy_model("Workshop Printer", 0x0016) == PrinterModel.ADVENTURER_4
     assert discovery.detect_legacy_model("Workshop Printer", 0x001E) == PrinterModel.ADVENTURER_4
     assert discovery.detect_legacy_model("Workshop Printer", 0x0008) == PrinterModel.ADVENTURER_3
 

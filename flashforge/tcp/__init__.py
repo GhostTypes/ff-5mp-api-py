@@ -6,6 +6,7 @@ for controlling FlashForge printers via their TCP API.
 """
 
 from .a3_client import A3BuildVolume, A3FileEntry, A3PrinterInfo, A3Thumbnail, FlashForgeA3Client
+from .a4_client import A4BuildVolume, A4FileEntry, A4PrinterInfo, FlashForgeA4Client
 from .ff_client import FlashForgeClient
 from .gcode import A3GCodeController, GCodeController, GCodes
 from .parsers import (
@@ -28,6 +29,7 @@ __all__ = [
     "FlashForgeTcpClientOptions",
     "FlashForgeClient",
     "FlashForgeA3Client",
+    "FlashForgeA4Client",
     "GCodes",
     "GCodeController",
     "A3GCodeController",
@@ -35,6 +37,9 @@ __all__ = [
     "A3PrinterInfo",
     "A3FileEntry",
     "A3Thumbnail",
+    "A4BuildVolume",
+    "A4PrinterInfo",
+    "A4FileEntry",
     "PrinterInfo",
     "TempInfo",
     "TempData",

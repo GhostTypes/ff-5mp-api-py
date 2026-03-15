@@ -22,7 +22,8 @@ LEGACY_PROTOCOL_SIZE = 140
 
 LEGACY_PRODUCT_IDS = {
     "Adventurer3": 0x0008,
-    "Adventurer4": 0x001E,
+    "Adventurer4Lite": 0x0016,
+    "Adventurer4Pro": 0x001E,
 }
 
 
@@ -508,7 +509,10 @@ class PrinterDiscovery:
         if "ADVENTURER 3" in upper_name or "ADVENTURER3" in upper_name or "AD3" in upper_name:
             return PrinterModel.ADVENTURER_3
 
-        if product_id == LEGACY_PRODUCT_IDS["Adventurer4"]:
+        if product_id in {
+            LEGACY_PRODUCT_IDS["Adventurer4Lite"],
+            LEGACY_PRODUCT_IDS["Adventurer4Pro"],
+        }:
             return PrinterModel.ADVENTURER_4
 
         if product_id == LEGACY_PRODUCT_IDS["Adventurer3"]:

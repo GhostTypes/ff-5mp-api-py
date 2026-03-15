@@ -9,7 +9,7 @@ Python library for controlling FlashForge 3D printers with async support for the
 | Adventurer 5M | Full |
 | Adventurer 5M Pro | Full |
 | AD5X | Full |
-| Adventurer 3 / 4 | TCP support |
+| Adventurer 3 / 4 | Dedicated TCP clients |
 
 ## Installation
 
@@ -64,7 +64,9 @@ asyncio.run(main())
 
 - `FlashForgeClient`: primary client for modern printers
 - `PrinterDiscovery`: recommended discovery API
-- `FlashForgeTcpClient` and `client.tcp_client`: lower-level TCP access for direct commands and legacy workflows
+- `FlashForgeA4Client`: documented TCP client for Adventurer 4 Lite / Pro printers
+- `FlashForgeA3Client`: documented TCP client for Adventurer 3 printers
+- `FlashForgeTcpClient` and `client.tcp_client`: lower-level TCP access for direct commands and generic legacy workflows
 
 ## Capabilities
 

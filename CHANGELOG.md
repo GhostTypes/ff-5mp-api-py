@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `FlashForgeA4Client` — dedicated Adventurer 4 Lite / Pro TCP client aligned with the documented M601 and M115 protocol behavior
+- `A4BuildVolume`, `A4FileEntry`, and `A4PrinterInfo` for typed Adventurer 4 responses
+
+### Changed
+- Discovery PID fallback now recognizes Adventurer 4 Lite (`0x0016`) as well as Adventurer 4 Pro (`0x001E`)
+- README guidance now points Adventurer 3 / 4 users at the dedicated TCP clients instead of only the generic legacy layer
+
 ## [1.1.1] - 2026-03-09
 
 ### Fixed
