@@ -427,7 +427,7 @@ class PrinterDiscovery:
             return None
 
     def parse_modern_protocol(self, buffer: bytes, ip_address: str) -> DiscoveredPrinter:
-        """Parse a modern 276-byte discovery response."""
+        """Parse a modern 276-byte (0x114) discovery response."""
         if len(buffer) < MODERN_PROTOCOL_SIZE:
             raise InvalidResponseError(len(buffer), ip_address)
 
@@ -435,10 +435,10 @@ class PrinterDiscovery:
         command_port = int.from_bytes(buffer[0x84:0x86], byteorder="big")
         vendor_id = int.from_bytes(buffer[0x86:0x88], byteorder="big")
         product_id = int.from_bytes(buffer[0x88:0x8A], byteorder="big")
+        status_code = int.from_bytes(buffer[0x8A:0x8C], byteorder="big")
         product_type = int.from_bytes(buffer[0x8C:0x8E], byteorder="big")
         event_port = int.from_bytes(buffer[0x8E:0x90], byteorder="big")
-        status_code = int.from_bytes(buffer[0x90:0x92], byteorder="big")
-        serial_number = buffer[0x92 : 0x92 + 130].decode("utf-8", errors="ignore").split("\x00", 1)[0]
+        serial_number = buffer[0x92 : 0x92 + 128].decode("utf-8", errors="ignore").split("\x00", 1)[0]
         model = self.detect_modern_model(name, product_type)
 
         return DiscoveredPrinter(

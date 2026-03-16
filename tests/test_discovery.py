@@ -35,9 +35,9 @@ def _build_modern_buffer(
     buffer[0x84:0x86] = command_port.to_bytes(2, byteorder="big")
     buffer[0x86:0x88] = vendor_id.to_bytes(2, byteorder="big")
     buffer[0x88:0x8A] = product_id.to_bytes(2, byteorder="big")
+    buffer[0x8A:0x8C] = status_code.to_bytes(2, byteorder="big")
     buffer[0x8C:0x8E] = product_type.to_bytes(2, byteorder="big")
     buffer[0x8E:0x90] = event_port.to_bytes(2, byteorder="big")
-    buffer[0x90:0x92] = status_code.to_bytes(2, byteorder="big")
     buffer[0x92 : 0x92 + len(serial_number)] = serial_number.encode("utf-8")
     return bytes(buffer)
 
