@@ -66,24 +66,24 @@ class FlashForgeA4Client(FlashForgeTcpClient):
         return self._control
 
     async def init_control(self) -> bool:
-        """Initialize control using the documented M601 flow."""
+        """Initialize control using the legacy M601 S1 login flow."""
         try:
-            response = await self.send_command_async("~M601")
+            response = await self.send_command_async(GCodes.CMD_LOGIN)
             if response is None:
-                logger.error("A4: failed to send M601 connection command")
+                logger.error("A4: failed to send M601 S1 login command")
                 return False
 
             if "Error: have been connected" in response:
                 logger.warning("A4: already connected to printer")
                 return True
 
-            if not self._is_successful_command_response("~M601", response):
+            if not self._is_successful_command_response(GCodes.CMD_LOGIN, response):
                 return False
 
             await asyncio.sleep(0.1)
             info = await self.get_printer_info()
             if not info:
-                logger.error("A4: failed to retrieve printer info after M601")
+                logger.error("A4: failed to retrieve printer info after M601 S1")
                 return False
 
             await self.start_keep_alive()

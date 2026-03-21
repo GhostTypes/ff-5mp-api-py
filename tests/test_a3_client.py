@@ -10,6 +10,20 @@ from flashforge.tcp import A3GCodeController, FlashForgeA3Client
 
 
 @pytest.mark.asyncio
+async def test_a3_init_control_uses_m601_s1_login():
+    """A3 init_control should send the legacy M601 S1 login command."""
+    client = FlashForgeA3Client("192.168.1.100")
+
+    with patch.object(
+        client,
+        "send_command_async",
+        AsyncMock(return_value="CMD M601 Received.\nok\n"),
+    ) as send_command:
+        assert await client.init_control() is True
+        send_command.assert_called_once_with("~M601 S1")
+
+
+@pytest.mark.asyncio
 async def test_a3_init_control_accepts_already_connected():
     """M601 already-connected responses should still initialize successfully."""
     client = FlashForgeA3Client("192.168.1.100")
@@ -56,6 +70,36 @@ async def test_a3_get_printer_info_parses_documented_m115():
     assert info.build_volume.z == 150
     assert info.tool_count == 1
     assert info.mac_address == "00:11:22:33:44:55"
+
+
+@pytest.mark.asyncio
+async def test_a3_get_printer_info_parses_sn_prefixed_serial_and_blank_lines():
+    """A3 M115 parsing should accept SN-prefixed serials and blank lines."""
+    client = FlashForgeA3Client("192.168.1.100")
+    with patch.object(
+        client,
+        "send_command_async",
+        AsyncMock(
+            return_value="\n".join(
+                [
+                    "echo: Machine Type: FlashForge Adventurer III",
+                    "Machine Name: MyPrinter",
+                    "",
+                    "Firmware: v1.3.7",
+                    "SN: SNADVA3M12345",
+                    "X: 150 Y: 150 Z: 150",
+                    "Tool Count: 1",
+                    "Mac Address:00:11:22:33:44:55",
+                    "ok",
+                ]
+            )
+        ),
+    ):
+        info = await client.get_printer_info()
+
+    assert info is not None
+    assert info.serial_number == "SNADVA3M12345"
+    assert info.firmware == "v1.3.7"
 
 
 @pytest.mark.asyncio

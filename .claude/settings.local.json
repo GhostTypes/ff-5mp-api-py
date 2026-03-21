@@ -13,7 +13,8 @@
       "Bash(robocopy:*)",
       "Bash(mypy:*)",
       "Bash(ruff check:*)",
-      "Bash(ruff format:*)"
+      "Bash(ruff format:*)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []

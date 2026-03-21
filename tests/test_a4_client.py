@@ -10,8 +10,8 @@ from flashforge.tcp import A4FileEntry, FlashForgeA4Client
 
 
 @pytest.mark.asyncio
-async def test_a4_init_control_uses_documented_m601_flow():
-    """A4 init_control should use M601 and then fetch M115 machine info."""
+async def test_a4_init_control_uses_documented_m601_s1_flow():
+    """A4 init_control should use M601 S1 and then fetch M115 machine info."""
     client = FlashForgeA4Client("192.168.1.110")
 
     with (
@@ -39,7 +39,7 @@ async def test_a4_init_control_uses_documented_m601_flow():
         patch.object(client, "start_keep_alive", AsyncMock()),
     ):
         assert await client.init_control() is True
-        assert send_command.call_args_list[0].args == ("~M601",)
+        assert send_command.call_args_list[0].args == ("~M601 S1",)
         assert send_command.call_args_list[1].args == ("~M115",)
 
 
@@ -118,6 +118,35 @@ async def test_a4_get_printer_info_parses_documented_pro_m115():
     assert info is not None
     assert info.variant == "pro"
     assert info.firmware == "v1.2.1 20230906"
+
+
+@pytest.mark.asyncio
+async def test_a4_get_printer_info_accepts_sn_prefixed_serials():
+    """A4 M115 parsing should accept SN-prefixed serial numbers."""
+    client = FlashForgeA4Client("192.168.1.110")
+    with patch.object(
+        client,
+        "send_command_async",
+        AsyncMock(
+            return_value="\n".join(
+                [
+                    "CMD M115 Received.",
+                    "Machine Type: Flashforge Adventurer 4",
+                    "Machine Name: Serial Printer",
+                    "Firmware: v2.0.5 20220527",
+                    "SN: A4SN67890",
+                    "X: 220 Y: 200 Z: 250",
+                    "Tool Count: 1",
+                    "Mac Address: 00:11:22:33:44:55",
+                    "ok",
+                ]
+            )
+        ),
+    ):
+        info = await client.get_printer_info()
+
+    assert info is not None
+    assert info.serial_number == "A4SN67890"
 
 
 @pytest.mark.asyncio

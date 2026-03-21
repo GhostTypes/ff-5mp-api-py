@@ -9,6 +9,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from .gcode.gcodes import GCodes
 from .parsers import EndstopStatus, LocationInfo, PrintStatus, TempInfo
 from .tcp_client import FlashForgeTcpClient, FlashForgeTcpClientOptions
 
@@ -112,15 +113,15 @@ class FlashForgeA3Client(FlashForgeTcpClient):
         return self._normalize_a3_text_response(response)
 
     async def init_control(self) -> bool:
-        """Initialize control by sending M601."""
+        """Initialize control by sending the legacy M601 S1 login command."""
         try:
             await asyncio.sleep(0.5)
-            response = await self.send_command_async("~M601")
+            response = await self.send_command_async(GCodes.CMD_LOGIN)
             if response is None:
                 return False
             if "Error: have been connected" in response:
                 return True
-            return self._is_successful_command_response("~M601", response)
+            return self._is_successful_command_response(GCodes.CMD_LOGIN, response)
         except Exception:
             return False
 
@@ -150,6 +151,8 @@ class FlashForgeA3Client(FlashForgeTcpClient):
                 info.machine_name = line.replace("Machine Name:", "", 1).strip()
             elif line.startswith("Firmware:"):
                 info.firmware = line.replace("Firmware:", "", 1).strip()
+            elif line.startswith("SN:"):
+                info.serial_number = line.replace("SN:", "", 1).strip()
             elif line.startswith("Serial Number:"):
                 info.serial_number = line.replace("Serial Number:", "", 1).strip()
             elif line.startswith("Tool Count:"):
