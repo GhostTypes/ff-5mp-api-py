@@ -1,3 +1,9 @@
+from typing import Final
+
+
+CAMERA_STREAM_PORT: Final[int] = 8080
+
+
 class Endpoints:
     """
     Endpoints for the "new" HTTP API

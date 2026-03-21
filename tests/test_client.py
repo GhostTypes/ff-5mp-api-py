@@ -44,6 +44,27 @@ def _mock_http_session(response_payload: dict, status: int = 200) -> MagicMock:
     return mock_session
 
 
+def _mock_request_context(status: int, headers: dict | None = None) -> MagicMock:
+    mock_response = MagicMock()
+    mock_response.status = status
+    mock_response.headers = headers or {}
+
+    mock_ctx = MagicMock()
+    mock_ctx.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_ctx.__aexit__ = AsyncMock(return_value=False)
+    return mock_ctx
+
+
+def _mock_probe_session(
+    head_ctx: MagicMock | None = None,
+    get_ctx: MagicMock | None = None,
+) -> MagicMock:
+    mock_session = MagicMock()
+    mock_session.head = MagicMock(return_value=head_ctx or _mock_request_context(404))
+    mock_session.get = MagicMock(return_value=get_ctx or _mock_request_context(404))
+    return mock_session
+
+
 @pytest.mark.asyncio
 async def test_initialize_success():
     """Client initializes successfully with valid responses."""
@@ -163,6 +184,66 @@ def test_constructor_supports_connection_overrides():
     assert client.get_endpoint("/detail") == "http://192.168.1.10:19098/detail"
     assert client.tcp_client.port == 19099
     assert client.led_control is True
+
+
+@pytest.mark.asyncio
+async def test_detect_camera_stream_returns_probe_url_when_head_succeeds():
+    """detect_camera_stream returns the OEM probe URL when HEAD confirms the stream."""
+    client = FlashForgeClient("192.168.1.120", "SN123", "CODE123")
+    session = _mock_probe_session(
+        head_ctx=_mock_request_context(
+            200,
+            {"Content-Type": "multipart/x-mixed-replace; boundary=frame"},
+        )
+    )
+    client._ensure_http_session = AsyncMock(return_value=session)
+
+    result = await client.detect_camera_stream(timeout_ms=1234)
+
+    assert result == "http://192.168.1.120:8080/?action=stream"
+    assert session.head.call_count == 1
+    assert session.get.call_count == 0
+    assert session.head.call_args.args[0] == "http://192.168.1.120:8080/?action=stream"
+    assert session.head.call_args.kwargs["timeout"].total == pytest.approx(1.234)
+
+
+@pytest.mark.asyncio
+async def test_detect_camera_stream_falls_back_to_get_when_head_fails():
+    """detect_camera_stream should retry with GET when HEAD is unsupported or fails."""
+    client = FlashForgeClient("192.168.1.120", "SN123", "CODE123")
+    session = _mock_probe_session(
+        get_ctx=_mock_request_context(
+            200,
+            {"Content-Type": "video/x-mjpeg"},
+        )
+    )
+    session.head = MagicMock(side_effect=asyncio.TimeoutError)
+    client._ensure_http_session = AsyncMock(return_value=session)
+
+    result = await client.detect_camera_stream(timeout_ms=2500)
+
+    assert result == "http://192.168.1.120:8080/?action=stream"
+    assert session.head.call_count == 1
+    assert session.get.call_count == 1
+    assert session.get.call_args.args[0] == "http://192.168.1.120:8080/?action=stream"
+    assert session.get.call_args.kwargs["timeout"].total == pytest.approx(2.5)
+
+
+@pytest.mark.asyncio
+async def test_detect_camera_stream_returns_empty_string_when_both_probes_fail():
+    """detect_camera_stream returns an empty string when no camera endpoint responds."""
+    client = FlashForgeClient("192.168.1.120", "SN123", "CODE123")
+    session = _mock_probe_session(
+        head_ctx=_mock_request_context(404),
+        get_ctx=_mock_request_context(404, {"Content-Type": "text/html"}),
+    )
+    client._ensure_http_session = AsyncMock(return_value=session)
+
+    result = await client.detect_camera_stream()
+
+    assert result == ""
+    assert session.head.call_count == 1
+    assert session.get.call_count == 1
 
 
 @pytest.mark.asyncio

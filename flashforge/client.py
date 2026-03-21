@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 import aiohttp
 
-from .api.constants.endpoints import Endpoints
+from .api.constants.endpoints import CAMERA_STREAM_PORT, Endpoints
 from .api.controls import Control, Files, Info, JobControl, TempControl
 from .api.controls.info import MachineInfoParser
 from .api.network.utils import NetworkUtils
@@ -220,6 +220,59 @@ class FlashForgeClient:
             await self._http_session.close()
 
         self.camera_stream_url = ""
+
+    async def detect_camera_stream(self, timeout_ms: int = 3000) -> str:
+        """
+        Probes the printer's known OEM camera endpoint.
+
+        Falls back to a short GET when HEAD is unsupported so MJPEG servers
+        that reject HEAD requests are still detected.
+
+        Args:
+            timeout_ms: Timeout for each probe attempt in milliseconds.
+
+        Returns:
+            The working camera stream URL, or an empty string if not detected.
+        """
+        probe_url = f"http://{self.ip_address}:{CAMERA_STREAM_PORT}/?action=stream"
+        timeout = aiohttp.ClientTimeout(total=timeout_ms / 1000)
+
+        if await self._probe_camera_stream_with_method("head", probe_url, timeout):
+            return probe_url
+
+        if await self._probe_camera_stream_with_method("get", probe_url, timeout):
+            return probe_url
+
+        return ""
+
+    async def _probe_camera_stream_with_method(
+        self,
+        method: str,
+        probe_url: str,
+        timeout: aiohttp.ClientTimeout,
+    ) -> bool:
+        try:
+            session = await self._ensure_http_session()
+            request = session.head if method == "head" else session.get
+
+            async with request(probe_url, timeout=timeout) as response:
+                return self._is_valid_camera_probe_response(
+                    response.status, response.headers.get("Content-Type", "")
+                )
+        except Exception:
+            return False
+
+    @staticmethod
+    def _is_valid_camera_probe_response(status: int, content_type: str | None) -> bool:
+        if status != 200:
+            return False
+
+        normalized_content_type = (content_type or "").lower()
+        return (
+            normalized_content_type == ""
+            or "multipart" in normalized_content_type
+            or "video/x-mjpeg" in normalized_content_type
+        )
 
     def cache_details(self, info: FFMachineInfo | None) -> bool:
         """
