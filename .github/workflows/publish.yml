@@ -78,11 +78,28 @@ jobs:
           ls -lh dist/
           twine check dist/*
 
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION="${{ steps.validate.outputs.version }}"
+          # Extract the section for this version from CHANGELOG.md
+          # Matches from "## [X.Y.Z]" until the next "## [" or end of file
+          CHANGELOG=$(awk "/^## \[$VERSION\]/{found=1; next} /^## \[/{if(found) exit} found{print}" CHANGELOG.md)
+
+          if [ -z "$CHANGELOG" ]; then
+            echo "Warning: No changelog entry found for version $VERSION"
+            CHANGELOG="No changelog entry found. See [CHANGELOG.md](https://github.com/GhostTypes/ff-5mp-api-py/blob/main/CHANGELOG.md) for details."
+          fi
+
+          # Write to file to preserve multiline content
+          echo "$CHANGELOG" > /tmp/changelog_body.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.validate.outputs.version }}
           name: Release ${{ steps.validate.outputs.version }}
+          body_path: /tmp/changelog_body.md
           files: dist/*
           generate_release_notes: true
           draft: false

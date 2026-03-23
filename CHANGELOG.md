@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-03-23
+
+### Fixed
+
+- Increased `currentPrintSpeed` and `printSpeedAdjust` validation limit from 200 to 1000 to support AD5X printers reporting speeds up to 500 (contributed by @spawnegit)
+- Replaced per-request `aiohttp.ClientSession()` creation with shared HTTP session across all control modules (`control.py`, `files.py`, `info.py`, `job_control.py`), fixing connection churn and respecting the configured timeout
+- Increased default HTTP timeout from 5s to 15s to prevent timeouts during print operations
+
+### Changed
+
+- Extracted duplicate `try/except aiohttp.ContentTypeError` JSON parsing pattern into a shared `json_from_response()` helper in `api/network/utils.py`
+- Release workflow now includes curated changelog entry alongside auto-generated commit notes in GitHub Releases
+
 ## [1.2.0] - 2026-03-21
 
 ### Added
@@ -123,7 +136,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Type hints for all public APIs
 - Inline code documentation
 
-[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/GhostTypes/ff-5mp-api-py/releases/tag/v1.1.1
 [1.0.2]: https://github.com/GhostTypes/ff-5mp-api-py/releases/tag/v1.0.2
