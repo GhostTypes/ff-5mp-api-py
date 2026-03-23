@@ -17,7 +17,7 @@ from ...models.responses import (
     AD5XUploadParams,
 )
 from ..constants.endpoints import Endpoints
-from ..network.utils import NetworkUtils
+from ..network.utils import NetworkUtils, json_from_response
 
 if TYPE_CHECKING:
     from ...client import FlashForgeClient
@@ -180,17 +180,7 @@ class JobControl:
                             print(f"Upload failed: Printer responded with status {response.status}")
                             return False
 
-                        # Fix for FlashForge printer's malformed Content-Type header
-                        # Some printers return "appliation/json" instead of "application/json"
-                        try:
-                            result = await response.json()
-                        except aiohttp.ContentTypeError:
-                            # Fallback: manually parse as JSON if Content-Type is malformed
-                            text = await response.text()
-                            import json
-
-                            result = json.loads(text)
-
+                        result = await json_from_response(response)
                         print("Upload Response Data:", result)
 
                         if NetworkUtils.is_ok(result):
@@ -240,27 +230,17 @@ class JobControl:
             }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.client.get_endpoint(Endpoints.GCODE_PRINT),
-                    json=payload,
-                    headers={"Content-Type": "application/json"},
-                ) as response:
-                    if response.status != 200:
-                        return False
+            session = await self.client.get_http_session()
+            async with session.post(
+                self.client.get_endpoint(Endpoints.GCODE_PRINT),
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                if response.status != 200:
+                    return False
 
-                    # Fix for FlashForge printer's malformed Content-Type header
-                    # Some printers return "appliation/json" instead of "application/json"
-                    try:
-                        result = await response.json()
-                    except aiohttp.ContentTypeError:
-                        # Fallback: manually parse as JSON if Content-Type is malformed
-                        text = await response.text()
-                        import json
-
-                        result = json.loads(text)
-
-                    return NetworkUtils.is_ok(result)
+                result = await json_from_response(response)
+                return NetworkUtils.is_ok(result)
 
         except Exception as error:
             print(f"PrintLocalFile error: {error}")
@@ -344,13 +324,7 @@ class JobControl:
                             )
                             return False
 
-                        # Fix for FlashForge printer's malformed Content-Type header
-                        try:
-                            result = await response.json()
-                        except aiohttp.ContentTypeError:
-                            text = await response.text()
-                            result = json.loads(text)
-
+                        result = await json_from_response(response)
                         print("AD5X Upload Response Data:", result)
 
                         if NetworkUtils.is_ok(result):
@@ -415,23 +389,17 @@ class JobControl:
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.client.get_endpoint(Endpoints.GCODE_PRINT),
-                    json=payload,
-                    headers={"Content-Type": "application/json"},
-                ) as response:
-                    if response.status != 200:
-                        return False
+            session = await self.client.get_http_session()
+            async with session.post(
+                self.client.get_endpoint(Endpoints.GCODE_PRINT),
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                if response.status != 200:
+                    return False
 
-                    # Fix for FlashForge printer's malformed Content-Type header
-                    try:
-                        result = await response.json()
-                    except aiohttp.ContentTypeError:
-                        text = await response.text()
-                        result = json.loads(text)
-
-                    return NetworkUtils.is_ok(result)
+                result = await json_from_response(response)
+                return NetworkUtils.is_ok(result)
 
         except Exception as error:
             print(f"AD5X Multi-Color Job error: {error}")
@@ -473,23 +441,17 @@ class JobControl:
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.client.get_endpoint(Endpoints.GCODE_PRINT),
-                    json=payload,
-                    headers={"Content-Type": "application/json"},
-                ) as response:
-                    if response.status != 200:
-                        return False
+            session = await self.client.get_http_session()
+            async with session.post(
+                self.client.get_endpoint(Endpoints.GCODE_PRINT),
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                if response.status != 200:
+                    return False
 
-                    # Fix for FlashForge printer's malformed Content-Type header
-                    try:
-                        result = await response.json()
-                    except aiohttp.ContentTypeError:
-                        text = await response.text()
-                        result = json.loads(text)
-
-                    return NetworkUtils.is_ok(result)
+                result = await json_from_response(response)
+                return NetworkUtils.is_ok(result)
 
         except Exception as error:
             print(f"AD5X Single-Color Job error: {error}")

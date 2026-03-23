@@ -4,12 +4,10 @@ FlashForge Python API - Control Module
 
 from typing import TYPE_CHECKING, Any
 
-import aiohttp
-
 from ...models.responses import FilamentArgs
 from ..constants.commands import Commands
 from ..constants.endpoints import Endpoints
-from ..network.utils import NetworkUtils
+from ..network.utils import NetworkUtils, json_from_response
 
 if TYPE_CHECKING:
     from ...client import FlashForgeClient
@@ -239,26 +237,16 @@ class Control:
         try:
             await self.client.is_http_client_busy()
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.client.get_endpoint(Endpoints.CONTROL),
-                    json=payload,
-                    headers={"Content-Type": "application/json"},
-                ) as response:
-                    # Fix for FlashForge printer's malformed Content-Type header
-                    # Some printers return "appliation/json" instead of "application/json"
-                    try:
-                        data = await response.json()
-                    except aiohttp.ContentTypeError:
-                        # Fallback: manually parse as JSON if Content-Type is malformed
-                        text = await response.text()
-                        import json
+            session = await self.client.get_http_session()
+            async with session.post(
+                self.client.get_endpoint(Endpoints.CONTROL),
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                data = await json_from_response(response)
+                print(f"Command reply: {data}")
 
-                        data = json.loads(text)
-
-                    print(f"Command reply: {data}")
-
-                    return NetworkUtils.is_ok(data)
+                return NetworkUtils.is_ok(data)
 
         except Exception as e:
             print(f"Error in send_control_command: {e}")
