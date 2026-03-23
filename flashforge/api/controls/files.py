@@ -5,13 +5,12 @@ FlashForge Python API - Files Module
 import base64
 from typing import TYPE_CHECKING
 
-import aiohttp
 from pydantic import ValidationError
 
 from ...models.machine_info import FFGcodeFileEntry
 from ...models.responses import GCodeListResponse, ThumbnailResponse
 from ..constants.endpoints import Endpoints
-from ..network.utils import NetworkUtils
+from ..network.utils import NetworkUtils, json_from_response
 
 if TYPE_CHECKING:
     from ...client import FlashForgeClient
@@ -65,73 +64,64 @@ class Files:
         payload = {"serialNumber": self.client.serial_number, "checkCode": self.client.check_code}
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.client.get_endpoint(Endpoints.GCODE_LIST),
-                    json=payload,
-                    headers={"Content-Type": "application/json"},
-                ) as response:
-                    if response.status != 200:
-                        return []
-
-                    # Fix for FlashForge printer's malformed Content-Type header
-                    # Some printers return "appliation/json" instead of "application/json"
-                    try:
-                        data = await response.json()
-                    except aiohttp.ContentTypeError:
-                        # Fallback: manually parse as JSON if Content-Type is malformed
-                        text = await response.text()
-                        import json
-
-                        data = json.loads(text)
-
-                    if not NetworkUtils.is_ok(data):
-                        print(f"Error retrieving file list: {NetworkUtils.get_error_message(data)}")
-                        return []
-
-                    # Parse the response using GCodeListResponse
-                    try:
-                        result = GCodeListResponse(**data)
-                    except ValidationError:
-                        raw_list = data.get("gcodeList", [])
-                        if isinstance(raw_list, list):
-                            entries: list[FFGcodeFileEntry] = []
-                            for file_name in raw_list:
-                                if isinstance(file_name, str):
-                                    entries.append(
-                                        FFGcodeFileEntry(
-                                            gcodeFileName=file_name,
-                                            printingTime=0,
-                                        )
-                                    )
-                            return entries
-                        return []
-
-                    # AD5X and newer printers provide detailed info in gcodeListDetail
-                    if result.gcode_list_detail and len(result.gcode_list_detail) > 0:
-                        return result.gcode_list_detail
-
-                    # Fallback for older printers using gcodeList
-                    if result.gcode_list and len(result.gcode_list) > 0:
-                        # Check if it's a list of strings or already FFGcodeFileEntry objects
-                        first_item = result.gcode_list[0]
-
-                        if isinstance(first_item, str):
-                            # Convert string array to FFGcodeFileEntry objects
-                            return [
-                                FFGcodeFileEntry(gcodeFileName=file_name, printingTime=0)
-                                for file_name in result.gcode_list
-                                if isinstance(file_name, str)
-                            ]
-                        elif isinstance(first_item, FFGcodeFileEntry):
-                            # Already FFGcodeFileEntry objects - need explicit type narrowing
-                            return [
-                                item
-                                for item in result.gcode_list
-                                if isinstance(item, FFGcodeFileEntry)
-                            ]
-
+            session = await self.client.get_http_session()
+            async with session.post(
+                self.client.get_endpoint(Endpoints.GCODE_LIST),
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                if response.status != 200:
                     return []
+
+                data = await json_from_response(response)
+
+                if not NetworkUtils.is_ok(data):
+                    print(f"Error retrieving file list: {NetworkUtils.get_error_message(data)}")
+                    return []
+
+                # Parse the response using GCodeListResponse
+                try:
+                    result = GCodeListResponse(**data)
+                except ValidationError:
+                    raw_list = data.get("gcodeList", [])
+                    if isinstance(raw_list, list):
+                        entries: list[FFGcodeFileEntry] = []
+                        for file_name in raw_list:
+                            if isinstance(file_name, str):
+                                entries.append(
+                                    FFGcodeFileEntry(
+                                        gcodeFileName=file_name,
+                                        printingTime=0,
+                                    )
+                                )
+                        return entries
+                    return []
+
+                # AD5X and newer printers provide detailed info in gcodeListDetail
+                if result.gcode_list_detail and len(result.gcode_list_detail) > 0:
+                    return result.gcode_list_detail
+
+                # Fallback for older printers using gcodeList
+                if result.gcode_list and len(result.gcode_list) > 0:
+                    # Check if it's a list of strings or already FFGcodeFileEntry objects
+                    first_item = result.gcode_list[0]
+
+                    if isinstance(first_item, str):
+                        # Convert string array to FFGcodeFileEntry objects
+                        return [
+                            FFGcodeFileEntry(gcodeFileName=file_name, printingTime=0)
+                            for file_name in result.gcode_list
+                            if isinstance(file_name, str)
+                        ]
+                    elif isinstance(first_item, FFGcodeFileEntry):
+                        # Already FFGcodeFileEntry objects - need explicit type narrowing
+                        return [
+                            item
+                            for item in result.gcode_list
+                            if isinstance(item, FFGcodeFileEntry)
+                        ]
+
+                return []
 
         except Exception as err:
             print(f"GetRecentFileList error: {err}")
@@ -156,33 +146,24 @@ class Files:
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.client.get_endpoint(Endpoints.GCODE_THUMB),
-                    json=payload,
-                    headers={"Content-Type": "application/json"},
-                ) as response:
-                    if response.status != 200:
-                        return None
+            session = await self.client.get_http_session()
+            async with session.post(
+                self.client.get_endpoint(Endpoints.GCODE_THUMB),
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                if response.status != 200:
+                    return None
 
-                    # Fix for FlashForge printer's malformed Content-Type header
-                    # Some printers return "appliation/json" instead of "application/json"
-                    try:
-                        data = await response.json()
-                    except aiohttp.ContentTypeError:
-                        # Fallback: manually parse as JSON if Content-Type is malformed
-                        text = await response.text()
-                        import json
+                data = await json_from_response(response)
 
-                        data = json.loads(text)
-
-                    if NetworkUtils.is_ok(data):
-                        # Parse response and return decoded image bytes
-                        result = ThumbnailResponse(**data)
-                        return base64.b64decode(result.image_data)
-                    else:
-                        print(f"Error retrieving thumbnail: {NetworkUtils.get_error_message(data)}")
-                        return None
+                if NetworkUtils.is_ok(data):
+                    # Parse response and return decoded image bytes
+                    result = ThumbnailResponse(**data)
+                    return base64.b64decode(result.image_data)
+                else:
+                    print(f"Error retrieving thumbnail: {NetworkUtils.get_error_message(data)}")
+                    return None
 
         except Exception as err:
             print(f"GetGcodeThumbnail error: {err}")

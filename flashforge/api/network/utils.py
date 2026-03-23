@@ -2,7 +2,24 @@
 FlashForge Python API - Network Utilities
 """
 
+import json
+
+import aiohttp
+
 from ...models.responses import GenericResponse
+
+
+async def json_from_response(response: aiohttp.ClientResponse) -> dict:
+    """Parse JSON from a response, with a fallback for malformed Content-Type headers.
+
+    Some FlashForge printers return "appliation/json" instead of "application/json",
+    causing aiohttp to raise ContentTypeError. This helper handles both cases.
+    """
+    try:
+        return await response.json()  # type: ignore[no-any-return]
+    except aiohttp.ContentTypeError:
+        text = await response.text()
+        return json.loads(text)
 
 
 class NetworkUtils:
