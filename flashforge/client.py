@@ -60,7 +60,7 @@ class FlashForgeClient:
 
         # Constants
         self._PORT = options.http_port if options and options.http_port is not None else 8898
-        self._HTTP_TIMEOUT = 5.0
+        self._HTTP_TIMEOUT = 15.0
 
         # HTTP client state
         self._http_session: aiohttp.ClientSession | None = None
