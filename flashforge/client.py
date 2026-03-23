@@ -13,7 +13,7 @@ import aiohttp
 from .api.constants.endpoints import CAMERA_STREAM_PORT, Endpoints
 from .api.controls import Control, Files, Info, JobControl, TempControl
 from .api.controls.info import MachineInfoParser
-from .api.network.utils import NetworkUtils
+from .api.network.utils import NetworkUtils, json_from_response
 from .models import FFMachineInfo, Product, ProductResponse
 from .tcp import FlashForgeClient as TcpClient
 from .tcp import FlashForgeTcpClientOptions, PrinterInfo
@@ -379,16 +379,7 @@ class FlashForgeClient:
                 if response.status != 200:
                     return False
 
-                # Fix for FlashForge printer's malformed Content-Type header
-                # Some printers return "appliation/json" instead of "application/json"
-                try:
-                    data = await response.json()
-                except aiohttp.ContentTypeError:
-                    # Fallback: manually parse as JSON if Content-Type is malformed
-                    text = await response.text()
-                    import json
-
-                    data = json.loads(text)
+                data = await json_from_response(response)
 
                 # Validate response structure
                 if not NetworkUtils.is_ok(data):

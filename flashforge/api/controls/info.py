@@ -5,11 +5,10 @@ FlashForge Python API - Info Module
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-import aiohttp
-
 from ...models.machine_info import FFMachineInfo, MachineState, Temperature
 from ...models.responses import DetailResponse, FFPrinterDetail
 from ..constants.endpoints import Endpoints
+from ..network.utils import json_from_response
 
 if TYPE_CHECKING:
     from ...client import FlashForgeClient
@@ -272,18 +271,7 @@ class Info:
                     print(f"Non-200 status from detail endpoint: {response.status}")
                     return None
 
-                # Fix for FlashForge printer's malformed Content-Type header
-                # Some printers return "appliation/json" instead of "application/json"
-                # We'll manually parse the text as JSON to bypass Content-Type validation
-                try:
-                    data = await response.json()
-                except aiohttp.ContentTypeError:
-                    # Fallback: manually parse as JSON if Content-Type is malformed
-                    text = await response.text()
-                    import json
-
-                    data = json.loads(text)
-
+                data = await json_from_response(response)
                 return DetailResponse(**data)
 
         except Exception as error:
