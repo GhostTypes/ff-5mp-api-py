@@ -262,29 +262,29 @@ class Info:
         payload = {"serialNumber": self.client.serial_number, "checkCode": self.client.check_code}
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.client.get_endpoint(Endpoints.DETAIL),
-                    json=payload,
-                    headers={"Content-Type": "application/json"},
-                ) as response:
-                    if response.status != 200:
-                        print(f"Non-200 status from detail endpoint: {response.status}")
-                        return None
+            session = await self.client.get_http_session()
+            async with session.post(
+                self.client.get_endpoint(Endpoints.DETAIL),
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                if response.status != 200:
+                    print(f"Non-200 status from detail endpoint: {response.status}")
+                    return None
 
-                    # Fix for FlashForge printer's malformed Content-Type header
-                    # Some printers return "appliation/json" instead of "application/json"
-                    # We'll manually parse the text as JSON to bypass Content-Type validation
-                    try:
-                        data = await response.json()
-                    except aiohttp.ContentTypeError:
-                        # Fallback: manually parse as JSON if Content-Type is malformed
-                        text = await response.text()
-                        import json
+                # Fix for FlashForge printer's malformed Content-Type header
+                # Some printers return "appliation/json" instead of "application/json"
+                # We'll manually parse the text as JSON to bypass Content-Type validation
+                try:
+                    data = await response.json()
+                except aiohttp.ContentTypeError:
+                    # Fallback: manually parse as JSON if Content-Type is malformed
+                    text = await response.text()
+                    import json
 
-                        data = json.loads(text)
+                    data = json.loads(text)
 
-                    return DetailResponse(**data)
+                return DetailResponse(**data)
 
         except Exception as error:
             print(f"GetDetailResponse Request error: {error}")
