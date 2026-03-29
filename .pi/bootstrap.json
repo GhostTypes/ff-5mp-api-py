@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "createdAt": "2026-03-29T02:22:43.394Z",
+  "updatedAt": "2026-03-29T02:25:02.166Z",
+  "projectRoot": "C:\\Users\\coper\\Documents\\GitHub\\ff-5mp-api-py",
+  "libraryRoot": "C:\\Users\\coper\\Documents\\GitHub\\agent-skills\\skills",
+  "lastStatus": "updated",
+  "lastSummary": "Bootstrap complete for FlashForge Python API (brownfield). Installed 8 skills into .pi/skills: mypy, pydantic-dev, ruff-dev, pytest, python-best-practices, best-practices, github-actions, sub-agent-creator. Generated 5 agents in .pi/agents: engineer (primary), code-quality, testing-specialist, data-model-specialist, devops-specialist. Extended existing .claude setup (5 skills, 3 agents) with additional testing, best-practices, and CI/CD capabilities.",
+  "installedSkills": [
+    {
+      "archiveId": "best-practices-a489fe0c9d",
+      "skillName": "best-practices",
+      "archivePath": "C:\\Users\\coper\\Documents\\GitHub\\agent-skills\\skills\\code-quality\\best-practices.skill",
+      "archiveRelativePath": "code-quality/best-practices.skill",
+      "installedPath": "C:\\Users\\coper\\Documents\\GitHub\\ff-5mp-api-py\\.pi\\skills\\best-practices",
+      "archiveMtimeMs": 1769975463239.265,
+      "archiveSize": 7812,
+      "rootSkillPath": "SKILL.md",
+      "source": "library",
+      "installedAt": "2026-03-29T02:22:41.727Z"
+    },
+    {
+      "archiveId": "github-actions-f7218c47f9",
+      "skillName": "github-actions",
+      "archivePath": "C:\\Users\\coper\\Documents\\GitHub\\agent-skills\\skills\\devops\\github-actions.skill",
+      "archiveRelativePath": "devops/github-actions.skill",
+      "installedPath": "C:\\Users\\coper\\Documents\\GitHub\\ff-5mp-api-py\\.pi\\skills\\github-actions",
+      "archiveMtimeMs": 1769985502078.0896,
+      "archiveSize": 531023,
+      "rootSkillPath": "SKILL.md",
+      "source": "library",
+      "installedAt": "2026-03-29T02:22:42.044Z"
+    },
+    {
+      "archiveId": "mypy-dde1aa2432",
+      "skillName": "mypy",
+      "archivePath": "C:\\Users\\coper\\Documents\\GitHub\\agent-skills\\skills\\python-dev\\mypy.skill",
+      "archiveRelativePath": "python-dev/mypy.skill",
+      "installedPath": "C:\\Users\\coper\\Documents\\GitHub\\ff-5mp-api-py\\.pi\\skills\\mypy",
+      "archiveMtimeMs": 1769975464000.5508,
+      "archiveSize": 260246,
+      "rootSkillPath": "SKILL.md",
+      "source": "library",
+      "installedAt": "2026-03-29T02:22:42.096Z"
+    },
+    {
+      "archiveId": "pydantic-dev-e0d0713a8c",
+      "skillName": "pydantic-dev",
+      "archivePath": "C:\\Users\\coper\\Documents\\GitHub\\agent-skills\\skills\\python-dev\\pydantic-dev.skill",
+      "archiveRelativePath": "python-dev/pydantic-dev.skill",
+      "installedPath": "C:\\Users\\coper\\Documents\\GitHub\\ff-5mp-api-py\\.pi\\skills\\pydantic-dev",
+      "archiveMtimeMs": 1769975464050.0486,
+      "archiveSize": 288364,
+      "rootSkillPath": "SKILL.md",
+      "source": "library",
+      "installedAt": "2026-03-29T02:22:42.311Z"
+    },
+    {
+      "archiveId": "pytest-f6eb3b3440",
+      "skillName": "pytest",
+      "archivePath": "C:\\Users\\coper\\Documents\\GitHub\\agent-skills\\skills\\python-dev\\pytest.skill",
+      "archiveRelativePath": "python-dev/pytest.skill",
+      "installedPath": "C:\\Users\\coper\\Documents\\GitHub\\ff-5mp-api-py\\.pi\\skills\\pytest",
+      "archiveMtimeMs": 1771108299545.1907,
+      "archiveSize": 313641,
+      "rootSkillPath": "SKILL.md",
+      "source": "library",
+      "installedAt": "2026-03-29T02:22:42.372Z"
+    },
+    {
+      "archiveId": "python-best-practices-6651a8f517",
+      "skillName": "python-best-practices",
+      "archivePath": "C:\\Users\\coper\\Documents\\GitHub\\agent-skills\\skills\\python-dev\\python-best-practices.skill",
+      "archiveRelativePath": "python-dev/python-best-practices.skill",
+      "installedPath": "C:\\Users\\coper\\Documents\\GitHub\\ff-5mp-api-py\\.pi\\skills\\python-best-practices",
+      "archiveMtimeMs": 1771108324411.7148,
+      "archiveSize": 36719,
+      "rootSkillPath": "SKILL.md",
+      "source": "library",
+      "installedAt": "2026-03-29T02:22:42.395Z"
+    },
+    {
+      "archiveId": "ruff-dev-01ee65f20c",
+      "skillName": "ruff-dev",
+      "archivePath": "C:\\Users\\coper\\Documents\\GitHub\\agent-skills\\skills\\python-dev\\ruff-dev.skill",
+      "archiveRelativePath": "python-dev/ruff-dev.skill",
+      "installedPath": "C:\\Users\\coper\\Documents\\GitHub\\ff-5mp-api-py\\.pi\\skills\\ruff-dev",
+      "archiveMtimeMs": 1769975464246.279,
+      "archiveSize": 998988,
+      "rootSkillPath": "SKILL.md",
+      "source": "library",
+      "installedAt": "2026-03-29T02:22:43.393Z"
+    },
+    {
+      "archiveId": "sub-agent-creator-707e1b3649",
+      "skillName": "sub-agent-creator",
+      "archivePath": "C:\\Users\\coper\\Documents\\GitHub\\agent-skills\\skills\\ai-llm-integration\\sub-agent-creator.skill",
+      "archiveRelativePath": "ai-llm-integration/sub-agent-creator.skill",
+      "installedPath": "C:\\Users\\coper\\Documents\\GitHub\\ff-5mp-api-py\\.pi\\skills\\sub-agent-creator",
+      "archiveMtimeMs": 1771108325063.95,
+      "archiveSize": 11255,
+      "rootSkillPath": "SKILL.md",
+      "source": "library",
+      "installedAt": "2026-03-29T02:22:41.657Z"
+    }
+  ],
+  "generatedAgents": [
+    {
+      "name": "code-quality",
+      "path": ".pi/agents/code-quality.md",
+      "generatedAt": "2026-03-29T02:25:02.166Z",
+      "skills": [
+        "ruff-dev",
+        "mypy",
+        "python-best-practices"
+      ],
+      "source": "bootstrap"
+    },
+    {
+      "name": "data-model-specialist",
+      "path": ".pi/agents/data-model-specialist.md",
+      "generatedAt": "2026-03-29T02:25:02.166Z",
+      "skills": [
+        "pydantic-dev"
+      ],
+      "source": "bootstrap"
+    },
+    {
+      "name": "devops-specialist",
+      "path": ".pi/agents/devops-specialist.md",
+      "generatedAt": "2026-03-29T02:25:02.166Z",
+      "skills": [
+        "github-actions"
+      ],
+      "source": "bootstrap"
+    },
+    {
+      "name": "engineer",
+      "path": ".pi/agents/engineer.md",
+      "generatedAt": "2026-03-29T02:25:02.166Z",
+      "skills": [
+        "python-best-practices",
+        "best-practices",
+        "sub-agent-creator"
+      ],
+      "source": "bootstrap"
+    },
+    {
+      "name": "testing-specialist",
+      "path": ".pi/agents/testing-specialist.md",
+      "generatedAt": "2026-03-29T02:25:02.166Z",
+      "skills": [
+        "pytest",
+        "python-best-practices"
+      ],
+      "source": "bootstrap"
+    }
+  ],
+  "migrationNotes": [
+    "Existing .claude skills (mypy, pydantic-dev, ruff-dev, sub-agent-creator) were mirrored to .pi/skills from the skill library with additional skills (pytest, python-best-practices, best-practices, github-actions).",
+    "Existing .claude agents (mypy-specialist, pydantic-specialist, ruff-specialist) remain untouched. New .pi agents provide broader multi-skill coverage (engineer, code-quality, testing-specialist, data-model-specialist, devops-specialist).",
+    "The .claude 'readme-generator' skill was not mirrored as it has no equivalent in the skill library — it's a custom skill specific to the .claude setup."
+  ],
+  "warnings": []
+}
