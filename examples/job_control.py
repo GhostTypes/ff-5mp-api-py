@@ -5,36 +5,54 @@ Demonstrates print job management operations.
 """
 
 import asyncio
+import os
 
-from flashforge import FlashForgeClient, FlashForgePrinterDiscovery, MachineState
+from flashforge import FlashForgeClient, FiveMClientConnectionOptions, MachineState, PrinterDiscovery
+
+
+def _build_connection_options(printer) -> FiveMClientConnectionOptions:
+    return FiveMClientConnectionOptions(
+        http_port=printer.event_port,
+        tcp_port=printer.command_port,
+    )
 
 
 async def main():
     """Print job control operations."""
+    check_code = os.getenv("FLASHFORGE_CHECK_CODE", "").strip()
+    if not check_code:
+        print("Set FLASHFORGE_CHECK_CODE before running this example")
+        return
 
-    # Discover and connect
-    discovery = FlashForgePrinterDiscovery()
-    printers = await discovery.discover_printers_async()
+    discovery = PrinterDiscovery()
+    printers = await discovery.discover()
 
     if not printers:
         print("No printers found")
         return
 
     printer = printers[0]
+    if not printer.serial_number:
+        print("Discovered printer did not report a serial number")
+        return
 
     async with FlashForgeClient(
-        printer.ip_address, printer.serial_number, printer.check_code
+        printer.ip_address,
+        printer.serial_number,
+        check_code,
+        options=_build_connection_options(printer),
     ) as client:
-        if not await client.initialize():
+        status = await client.get_printer_status()
+        if not status:
             print("Failed to connect")
             return
 
-        await client.init_control()
+        if not await client.init_control():
+            print("Failed to initialize control")
+            return
 
         print(f"Connected to {client.printer_name}\n")
 
-        # Check current status
-        status = await client.get_printer_status()
         if status:
             print(f"Current state: {status.machine_state.value}")
 
@@ -43,28 +61,19 @@ async def main():
                 print(f"Progress: {status.print_progress}%")
                 print(f"Layer: {status.current_print_layer}/{status.total_print_layers}\n")
 
-                # Pause print
                 print("Pausing print...")
                 if await client.job_control.pause_print_job():
                     print("  Print paused")
                     await asyncio.sleep(2)
 
-                    # Resume print
                     print("Resuming print...")
                     if await client.job_control.resume_print_job():
                         print("  Print resumed")
 
-                    # Optionally cancel
-                    # print("Canceling print...")
-                    # if await client.job_control.cancel_print_job():
-                    #     print("  Print cancelled")
-
             elif status.machine_state == MachineState.READY:
                 print("Printer is ready\n")
 
-                # Upload and print a file
-                file_path = "model.gcode"  # Path to your G-code file
-
+                file_path = "model.gcode"
                 print(f"Uploading {file_path}...")
                 if await client.job_control.upload_file(
                     file_path, start_print=True, level_before_print=True
@@ -73,12 +82,6 @@ async def main():
                 else:
                     print("  Upload failed")
 
-                # Or print a file already on the printer
-                # print("Starting local file...")
-                # if await client.job_control.print_local_file("existing_file.gcode"):
-                #     print("  Print started")
-
-        # Monitor print progress
         if status and status.machine_state == MachineState.PRINTING:
             print("\nMonitoring print progress...")
             for _i in range(5):

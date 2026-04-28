@@ -12,6 +12,7 @@ Use Cases:
 """
 
 import asyncio
+import os
 
 from flashforge import FlashForgeClient
 from flashforge.tcp.ff_client import FlashForgeClient as TcpClient
@@ -27,13 +28,10 @@ async def standalone_tcp_led_control():
     """
     print("=== Standalone TCP LED Control ===\n")
 
-    client = TcpClient("192.168.1.100")
+    ip_address = os.getenv("FLASHFORGE_IP", "192.168.1.100")
+    client = TcpClient(ip_address)
 
     try:
-        if not await client.connect():
-            print("Failed to connect via TCP")
-            return
-
         if not await client.init_control():
             print("Failed to initialize control session")
             return
@@ -55,7 +53,7 @@ async def standalone_tcp_led_control():
             print("Failed to turn LEDs off")
 
     finally:
-        await client.disconnect()
+        await client.dispose()
         print("Disconnected\n")
 
 
@@ -71,10 +69,19 @@ async def dual_mode_led_control():
     """
     print("=== Dual-Mode LED Control (HTTP + TCP Fallback) ===\n")
 
-    client = FlashForgeClient("192.168.1.100")
+    ip_address = os.getenv("FLASHFORGE_IP", "192.168.1.100")
+    serial_number = os.getenv("FLASHFORGE_SERIAL", "").strip()
+    check_code = os.getenv("FLASHFORGE_CHECK_CODE", "").strip()
+
+    if not serial_number or not check_code:
+        print("Set FLASHFORGE_SERIAL and FLASHFORGE_CHECK_CODE before running this example")
+        return
+
+    client = FlashForgeClient(ip_address, serial_number, check_code)
 
     try:
-        if not await client.initialize():
+        status = await client.get_printer_status()
+        if not status:
             print("Failed to initialize HTTP client")
             return
 
@@ -113,7 +120,7 @@ async def dual_mode_led_control():
         print("\nLED control completed")
 
     finally:
-        await client.disconnect()
+        await client.dispose()
         print("Disconnected\n")
 
 

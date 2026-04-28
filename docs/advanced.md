@@ -230,10 +230,6 @@ async def standalone_tcp_led_control():
     client = TcpClient("192.168.1.100")
     
     try:
-        if not await client.connect():
-            print("Failed to connect")
-            return
-        
         if not await client.init_control():
             print("Failed to initialize control")
             return
@@ -244,7 +240,7 @@ async def standalone_tcp_led_control():
         await client.led_off()
         
     finally:
-        await client.disconnect()
+        await client.dispose()
 ```
 
 **M146 Command Details:**
@@ -261,7 +257,7 @@ If printer discovery doesn't work (e.g., across subnets or VLANs), you can conne
 **Requirements:**
 - IP address of the printer
 - Serial number (required for HTTP API operations)
-- Check code (authentication token)
+- Check code (authentication token, unique per printer, not returned by discovery)
 
 ```python
 from flashforge import FlashForgeClient
@@ -274,7 +270,8 @@ client = FlashForgeClient(
 )
 
 async with client:
-    if await client.initialize():
+    status = await client.get_printer_status()
+    if status:
         print(f"Connected to {client.printer_name}")
 ```
 

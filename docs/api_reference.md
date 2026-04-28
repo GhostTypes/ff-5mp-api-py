@@ -19,7 +19,7 @@ FlashForgeClient(ip_address: str, serial_number: str, check_code: str)
 **Parameters:**
 - `ip_address` (str): IP address of the printer
 - `serial_number` (str): Serial number of the printer (required for HTTP API)
-- `check_code` (str): Authentication check code
+- `check_code` (str): Per-printer authentication check code (not returned by discovery)
 
 #### Methods
 
@@ -83,7 +83,6 @@ FlashForgeClient(ip_address: str, serial_number: str, check_code: str)
 
 ```python
 async with FlashForgeClient(ip, serial, check_code) as client:
-    await client.initialize()
     # Use client...
 # Automatic cleanup
 ```
@@ -107,12 +106,12 @@ Backward-compatible wrapper around `PrinterDiscovery`.
 
 #### Methods
 
-- `async discover_printers_async(timeout_ms: int = 3000, idle_timeout_ms: int = 1000, max_retries: int = 3) -> List[FlashForgePrinter]`  
+- `async discover_printers_async(timeout_ms: int = 10000, idle_timeout_ms: int = 1500, max_retries: int = 3) -> List[FlashForgePrinter]`  
   Discovers printers on the network. Returns list of discovered printers.
 
 **Parameters:**
-- `timeout_ms` (int): Total discovery timeout in milliseconds (default: 3000)
-- `idle_timeout_ms` (int): Idle timeout between responses (default: 1000)
+- `timeout_ms` (int): Total discovery timeout in milliseconds (default: 10000)
+- `idle_timeout_ms` (int): Idle timeout between responses (default: 1500)
 - `max_retries` (int): Maximum retry attempts (default: 3)
 
 ### `flashforge.FlashForgePrinter`
@@ -548,8 +547,8 @@ Thumbnail image data and metadata.
 from flashforge import FlashForgeClient
 
 async with FlashForgeClient("192.168.1.100", "SERIAL", "CHECK_CODE") as client:
-    if await client.initialize():
-        status = await client.get_printer_status()
+    status = await client.get_printer_status()
+    if status:
         print(f"Printer: {status.name}, State: {status.machine_state.value}")
 ```
 

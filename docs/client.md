@@ -34,20 +34,36 @@ If you need the older Python compatibility surface, `FlashForgePrinterDiscovery`
 
 ## Connect to a Printer
 
-Modern LAN-mode HTTP printers require the printer IP address, serial number, and check code.
+Modern LAN-mode HTTP printers require the printer IP address, serial number, and check code. The check code is a per-printer credential and is not returned by discovery.
 
 ```python
 import asyncio
-from flashforge import FlashForgeClient
+from flashforge import FlashForgeClient, FiveMClientConnectionOptions, PrinterDiscovery
 
 
 async def connect():
+    discovery = PrinterDiscovery()
+    printers = await discovery.discover()
+    if not printers:
+        return
+
+    printer = printers[0]
+    if not printer.serial_number:
+        return
+
+    options = FiveMClientConnectionOptions(
+        http_port=printer.event_port,
+        tcp_port=printer.command_port,
+    )
+
     async with FlashForgeClient(
-        ip_address="192.168.1.100",
-        serial_number="SERIAL_NUMBER",
-        check_code="CHECK_CODE",
+        ip_address=printer.ip_address,
+        serial_number=printer.serial_number,
+        check_code="YOUR_CHECK_CODE",
+        options=options,
     ) as client:
-        if not await client.initialize():
+        status = await client.get_printer_status()
+        if not status:
             return
 
         await client.init_control()
@@ -65,7 +81,6 @@ asyncio.run(connect())
 
 ```python
 async with FlashForgeClient(ip, serial, check_code) as client:
-    await client.initialize()
     status = await client.get_printer_status()
     print(status.machine_state)
 ```
@@ -74,7 +89,6 @@ async with FlashForgeClient(ip, serial, check_code) as client:
 
 ```python
 async with FlashForgeClient(ip, serial, check_code) as client:
-    await client.initialize()
     await client.init_control()
 
     await client.temp_control.set_extruder_temp(200)
@@ -85,7 +99,6 @@ async with FlashForgeClient(ip, serial, check_code) as client:
 
 ```python
 async with FlashForgeClient(ip, serial, check_code) as client:
-    await client.initialize()
     await client.init_control()
 
     await client.control.home_axes()
@@ -100,8 +113,6 @@ Python also exposes some convenience wrappers on the top-level client, such as `
 
 ```python
 async with FlashForgeClient(ip, serial, check_code) as client:
-    await client.initialize()
-
     if client.camera_stream_url:
         print(f"OEM camera stream: {client.camera_stream_url}")
 ```
@@ -110,8 +121,6 @@ async with FlashForgeClient(ip, serial, check_code) as client:
 
 ```python
 async with FlashForgeClient(ip, serial, check_code) as client:
-    await client.initialize()
-
     files = await client.files.get_file_list()
     recent = await client.files.get_recent_file_list()
 ```

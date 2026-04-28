@@ -5,41 +5,59 @@ Demonstrates low-level TCP operations and parsers.
 """
 
 import asyncio
+import os
 
-from flashforge import FlashForgeClient, FlashForgePrinterDiscovery
+from flashforge import FlashForgeClient, FiveMClientConnectionOptions, PrinterDiscovery
+
+
+def _build_connection_options(printer) -> FiveMClientConnectionOptions:
+    return FiveMClientConnectionOptions(
+        http_port=printer.event_port,
+        tcp_port=printer.command_port,
+    )
 
 
 async def main():
     """Advanced TCP client operations."""
+    check_code = os.getenv("FLASHFORGE_CHECK_CODE", "").strip()
+    if not check_code:
+        print("Set FLASHFORGE_CHECK_CODE before running this example")
+        return
 
-    # Discover and connect
-    discovery = FlashForgePrinterDiscovery()
-    printers = await discovery.discover_printers_async()
+    discovery = PrinterDiscovery()
+    printers = await discovery.discover()
 
     if not printers:
         print("No printers found")
         return
 
     printer = printers[0]
+    if not printer.serial_number:
+        print("Discovered printer did not report a serial number")
+        return
 
     async with FlashForgeClient(
-        printer.ip_address, printer.serial_number, printer.check_code
+        printer.ip_address,
+        printer.serial_number,
+        check_code,
+        options=_build_connection_options(printer),
     ) as client:
-        if not await client.initialize():
+        status = await client.get_printer_status()
+        if not status:
             print("Failed to connect")
             return
 
-        await client.init_control()
+        if not await client.init_control():
+            print("Failed to initialize control")
+            return
 
         print(f"Connected to {client.printer_name}\n")
 
-        # Send raw G-code command
         print("=== Raw G-code Commands ===\n")
         response = await client.tcp_client.send_command_async("~M105")
         print("M105 (Get Temperature) response:")
         print(f"  {response}\n")
 
-        # Get printer info via TCP
         print("=== Printer Info (TCP) ===\n")
         printer_info = await client.tcp_client.get_printer_info()
         if printer_info:
@@ -49,19 +67,17 @@ async def main():
                 f"Build volume: {printer_info.x_size}x{printer_info.y_size}x{printer_info.z_size}mm\n"
             )
 
-        # Get temperature info
         print("=== Temperature Info (TCP) ===\n")
         temp_info = await client.tcp_client.get_temp_info()
         if temp_info:
             extruder = temp_info.get_extruder_temp()
             bed = temp_info.get_bed_temp()
             if extruder:
-                print(f"Extruder: {extruder.current}°C / {extruder.set}°C")
+                print(f"Extruder: {extruder.current}C / {extruder.set}C")
             if bed:
-                print(f"Bed: {bed.current}°C / {bed.set}°C")
+                print(f"Bed: {bed.current}C / {bed.set}C")
             print()
 
-        # Get location info
         print("=== Location Info (TCP) ===\n")
         location = await client.tcp_client.get_location_info()
         if location:
@@ -69,7 +85,6 @@ async def main():
             print(f"Y: {location.y_pos}mm")
             print(f"Z: {location.z_pos}mm\n")
 
-        # Get endstop status
         print("=== Endstop Status (TCP) ===\n")
         endstop_status = await client.tcp_client.get_endstop_status()
         if endstop_status:
@@ -80,7 +95,6 @@ async def main():
             if endstop_status.current_file:
                 print(f"Current file: {endstop_status.current_file}")
 
-            # Convenience methods
             if endstop_status.is_printing():
                 print("Status: Printer is actively printing")
             elif endstop_status.is_paused():
@@ -91,7 +105,6 @@ async def main():
                 print("Status: Print completed")
             print()
 
-        # Get print status
         print("=== Print Status (TCP) ===\n")
         print_status = await client.tcp_client.get_print_status()
         if print_status:
@@ -105,7 +118,6 @@ async def main():
                 print("Print is complete")
             print()
 
-        # Convenience methods
         print("=== Convenience Methods ===\n")
         is_ready = await client.tcp_client.is_printer_ready()
         print(f"Printer ready: {is_ready}")

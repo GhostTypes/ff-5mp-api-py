@@ -5,8 +5,16 @@ Demonstrates real-time status monitoring and continuous updates.
 """
 
 import asyncio
+import os
 
-from flashforge import FlashForgeClient, FlashForgePrinterDiscovery, MachineState
+from flashforge import FlashForgeClient, FiveMClientConnectionOptions, MachineState, PrinterDiscovery
+
+
+def _build_connection_options(printer) -> FiveMClientConnectionOptions:
+    return FiveMClientConnectionOptions(
+        http_port=printer.event_port,
+        tcp_port=printer.command_port,
+    )
 
 
 async def monitor_status(client, duration_seconds=30):
@@ -20,29 +28,27 @@ async def monitor_status(client, duration_seconds=30):
         status = await client.get_printer_status()
 
         if status:
-            # Print state changes
             if status.machine_state != last_state:
                 print(f"State changed: {status.machine_state.value}")
                 last_state = status.machine_state
 
-            # Print status based on state
             if status.machine_state == MachineState.PRINTING:
                 print(
                     f"  Progress: {status.print_progress}% "
                     f"(Layer {status.current_print_layer}/{status.total_print_layers})"
                 )
                 print(f"  File: {status.print_file_name}")
-                print(f"  Extruder: {status.extruder.current}°C")
-                print(f"  Bed: {status.print_bed.current}°C")
+                print(f"  Extruder: {status.extruder.current}C")
+                print(f"  Bed: {status.print_bed.current}C")
 
             elif status.machine_state == MachineState.HEATING:
-                print(f"  Extruder: {status.extruder.current}°C -> {status.extruder.set}°C")
-                print(f"  Bed: {status.print_bed.current}°C -> {status.print_bed.set}°C")
+                print(f"  Extruder: {status.extruder.current}C -> {status.extruder.set}C")
+                print(f"  Bed: {status.print_bed.current}C -> {status.print_bed.set}C")
 
             elif status.machine_state == MachineState.READY:
                 print(
-                    f"  Ready - Extruder: {status.extruder.current}°C, "
-                    f"Bed: {status.print_bed.current}°C"
+                    f"  Ready - Extruder: {status.extruder.current}C, "
+                    f"Bed: {status.print_bed.current}C"
                 )
 
         await asyncio.sleep(2)
@@ -60,8 +66,8 @@ async def monitor_temperatures(client, duration_seconds=20):
 
             if extruder and bed:
                 print(
-                    f"[{i * 2}s] Extruder: {extruder.current}°C/{extruder.set}°C, "
-                    f"Bed: {bed.current}°C/{bed.set}°C"
+                    f"[{i * 2}s] Extruder: {extruder.current}C/{extruder.set}C, "
+                    f"Bed: {bed.current}C/{bed.set}C"
                 )
 
         await asyncio.sleep(2)
@@ -105,33 +111,39 @@ async def monitor_print_progress(client, check_interval=5):
 
 async def main():
     """Run status monitoring examples."""
+    check_code = os.getenv("FLASHFORGE_CHECK_CODE", "").strip()
+    if not check_code:
+        print("Set FLASHFORGE_CHECK_CODE before running this example")
+        return
 
-    # Discover and connect
-    discovery = FlashForgePrinterDiscovery()
-    printers = await discovery.discover_printers_async()
+    discovery = PrinterDiscovery()
+    printers = await discovery.discover()
 
     if not printers:
         print("No printers found")
         return
 
     printer = printers[0]
+    if not printer.serial_number:
+        print("Discovered printer did not report a serial number")
+        return
 
     async with FlashForgeClient(
-        printer.ip_address, printer.serial_number, printer.check_code
+        printer.ip_address,
+        printer.serial_number,
+        check_code,
+        options=_build_connection_options(printer),
     ) as client:
-        if not await client.initialize():
+        status = await client.get_printer_status()
+        if not status:
             print("Failed to connect")
             return
 
         print(f"Connected to {client.printer_name}\n")
 
-        # Monitor general status
         await monitor_status(client, duration_seconds=30)
-
-        # Monitor temperatures
         await monitor_temperatures(client, duration_seconds=20)
 
-        # Monitor print progress (if printing)
         status = await client.get_printer_status()
         if status and status.machine_state == MachineState.PRINTING:
             await monitor_print_progress(client, check_interval=5)

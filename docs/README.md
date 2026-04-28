@@ -23,14 +23,22 @@ Read [parity.md](parity.md) first if you are comparing both libraries or maintai
 - `PrinterDiscovery` for new discovery code
 - `FlashForgePrinterDiscovery` only when you need compatibility with older Python callers
 
+For modern HTTP printers, the check code is a per-printer credential and must come from user input or saved config.
+
 ## Quick Example
 
 ```python
 import asyncio
-from flashforge import FlashForgeClient, PrinterDiscovery
+import os
+from flashforge import FlashForgeClient, FiveMClientConnectionOptions, PrinterDiscovery
 
 
 async def main():
+    check_code = os.getenv("FLASHFORGE_CHECK_CODE", "").strip()
+    if not check_code:
+        print("Set FLASHFORGE_CHECK_CODE before running this example")
+        return
+
     discovery = PrinterDiscovery()
     printers = await discovery.discover()
 
@@ -39,13 +47,23 @@ async def main():
         return
 
     printer = printers[0]
+    if not printer.serial_number:
+        print("Discovered printer did not report a serial number")
+        return
+
+    options = FiveMClientConnectionOptions(
+        http_port=printer.event_port,
+        tcp_port=printer.command_port,
+    )
 
     async with FlashForgeClient(
         printer.ip_address,
-        printer.serial_number or "SERIAL_NUMBER",
-        "CHECK_CODE",
+        printer.serial_number,
+        check_code,
+        options=options,
     ) as client:
-        if not await client.initialize():
+        status = await client.get_printer_status()
+        if not status:
             return
 
         status = await client.get_printer_status()

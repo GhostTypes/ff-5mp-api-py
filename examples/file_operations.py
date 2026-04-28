@@ -5,33 +5,50 @@ Demonstrates file management and thumbnail operations.
 """
 
 import asyncio
+import os
 
-from flashforge import FlashForgeClient, FlashForgePrinterDiscovery
+from flashforge import FlashForgeClient, FiveMClientConnectionOptions, PrinterDiscovery
+
+
+def _build_connection_options(printer) -> FiveMClientConnectionOptions:
+    return FiveMClientConnectionOptions(
+        http_port=printer.event_port,
+        tcp_port=printer.command_port,
+    )
 
 
 async def main():
     """File operations."""
+    check_code = os.getenv("FLASHFORGE_CHECK_CODE", "").strip()
+    if not check_code:
+        print("Set FLASHFORGE_CHECK_CODE before running this example")
+        return
 
-    # Discover and connect
-    discovery = FlashForgePrinterDiscovery()
-    printers = await discovery.discover_printers_async()
+    discovery = PrinterDiscovery()
+    printers = await discovery.discover()
 
     if not printers:
         print("No printers found")
         return
 
     printer = printers[0]
+    if not printer.serial_number:
+        print("Discovered printer did not report a serial number")
+        return
 
     async with FlashForgeClient(
-        printer.ip_address, printer.serial_number, printer.check_code
+        printer.ip_address,
+        printer.serial_number,
+        check_code,
+        options=_build_connection_options(printer),
     ) as client:
-        if not await client.initialize():
+        status = await client.get_printer_status()
+        if not status:
             print("Failed to connect")
             return
 
         print(f"Connected to {client.printer_name}\n")
 
-        # List files on printer (TCP)
         print("Files on printer:")
         files = await client.files.get_file_list()
         if files:
@@ -40,7 +57,6 @@ async def main():
         else:
             print("  No files found")
 
-        # Get recent files with metadata (HTTP)
         print("\nRecent files:")
         recent = await client.files.get_recent_file_list()
         if recent:
@@ -54,12 +70,10 @@ async def main():
         else:
             print("  No recent files")
 
-        # Get thumbnail for a file
         if files:
             filename = files[0]
             print(f"\nGetting thumbnail for {filename}...")
 
-            # Method 1: HTTP API (recommended)
             thumbnail_bytes = await client.files.get_gcode_thumbnail(filename)
             if thumbnail_bytes:
                 output_path = f"thumbnail_{filename}.png"
@@ -69,17 +83,14 @@ async def main():
             else:
                 print("  No thumbnail available")
 
-            # Method 2: TCP client (alternative)
             thumbnail_info = await client.tcp_client.get_thumbnail(filename)
             if thumbnail_info and thumbnail_info.has_image_data():
                 width, height = thumbnail_info.get_image_size()
                 print(f"  Thumbnail size: {width}x{height}")
 
-                # Save using built-in method
                 if thumbnail_info.save_to_file_sync(f"tcp_thumbnail_{filename}.png"):
                     print("  Saved via TCP method")
 
-                # Or get as base64 data URL
                 data_url = thumbnail_info.to_base64_data_url()
                 if data_url:
                     print(f"  Data URL length: {len(data_url)} chars")
