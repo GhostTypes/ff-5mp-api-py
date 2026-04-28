@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flashforge-python-api"
-version = "1.2.1"
+version = "1.2.2"
 description = "A comprehensive Python library for controlling FlashForge 3D printers"
 readme = "README.md"
 license = "MIT"
@@ -19,6 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Hardware :: Hardware Drivers",
     "Topic :: Scientific/Engineering",
@@ -27,7 +28,7 @@ requires-python = ">=3.11"
 dependencies = [
     "aiohttp>=3.8.0",
     "pydantic>=2.0.0",
-    "netifaces>=0.11.0",
+    "ifaddr>=0.2.0",
     "requests>=2.31.0",
 ]
 
@@ -97,7 +98,7 @@ exclude = '(^tests/|^examples/)'
 
 [[tool.mypy.overrides]]
 module = [
-    "netifaces.*",
+    "ifaddr.*",
 ]
 ignore_missing_imports = true
 

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-04-27
+
+### Fixed
+
+- Replaced `netifaces` (source-only on PyPI) with `ifaddr` (pure-Python, wheels everywhere) for network interface enumeration. Fixes installation failure on Python 3.14 / Home Assistant 2026.4.x where `netifaces==0.11.0` cannot build, which previously caused `from flashforge import ...` to raise `ImportError` at module load and broke the Home Assistant config flow with "Invalid handler specified" — even for manual setup paths that didn't use discovery. Reported in [ff-5mp-hass#10](https://github.com/GhostTypes/ff-5mp-hass/issues/10).
+- Synced `flashforge.__version__` with `pyproject.toml` (was stuck at `1.1.1`).
+
+### Changed
+
+- Added Python 3.14 to the supported versions classifier list.
+
 ## [1.2.1] - 2026-03-23
 
 ### Fixed

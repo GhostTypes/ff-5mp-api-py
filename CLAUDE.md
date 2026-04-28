@@ -307,7 +307,7 @@ Certain features only work on specific models:
 **Core runtime** (required):
 - `aiohttp>=3.8.0` - Async HTTP client
 - `pydantic>=2.0.0` - Data validation and models
-- `netifaces>=0.11.0` - Network interface enumeration for discovery
+- `ifaddr>=0.2.0` - Pure-Python network interface enumeration for discovery
 - `requests>=2.31.0` - Sync HTTP (used in some utilities)
 
 **Development** (optional `[dev]`):

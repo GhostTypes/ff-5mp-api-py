@@ -114,23 +114,19 @@ def test_calculate_broadcast_address():
     assert discovery._calculate_broadcast_address("invalid", "255.255.255.0") is None
 
 
-@patch("netifaces.interfaces")
-@patch("netifaces.ifaddresses")
-def test_get_broadcast_addresses(mock_ifaddresses, mock_interfaces):
+@patch("flashforge.discovery.discovery.ifaddr.get_adapters")
+def test_get_broadcast_addresses(mock_get_adapters):
     """Broadcast discovery still enumerates live interfaces with a global fallback."""
     discovery = FlashForgePrinterDiscovery()
 
-    import netifaces
+    eth_ip = Mock(is_IPv4=True, ip="192.168.1.100", network_prefix=24)
+    lo_ip = Mock(is_IPv4=True, ip="127.0.0.1", network_prefix=8)
+    v6_ip = Mock(is_IPv4=False, ip=("fe80::1", 0, 0), network_prefix=64)
 
-    mock_interfaces.return_value = ["eth0", "lo"]
-    mock_ifaddresses.side_effect = lambda iface: {
-        netifaces.AF_INET: [
-            {
-                "addr": "192.168.1.100" if iface == "eth0" else "127.0.0.1",
-                "netmask": "255.255.255.0" if iface == "eth0" else "255.0.0.0",
-            }
-        ]
-    }
+    mock_get_adapters.return_value = [
+        Mock(ips=[eth_ip, v6_ip]),
+        Mock(ips=[lo_ip]),
+    ]
 
     addresses = discovery._get_broadcast_addresses()
 

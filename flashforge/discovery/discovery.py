@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
 from typing import Any
 
-import netifaces
+import ifaddr
 
 logger = logging.getLogger(__name__)
 
@@ -535,26 +535,27 @@ class PrinterDiscovery:
         broadcast_addresses: list[str] = []
 
         try:
-            for interface_name in netifaces.interfaces():
-                try:
-                    addresses = netifaces.ifaddresses(interface_name)
-                    if netifaces.AF_INET not in addresses:
+            for adapter in ifaddr.get_adapters():
+                for ip in adapter.ips:
+                    if not ip.is_IPv4:
                         continue
 
-                    for addr_info in addresses[netifaces.AF_INET]:
-                        if addr_info.get("addr", "").startswith("127."):
-                            continue
+                    ip_addr = ip.ip
+                    if not isinstance(ip_addr, str) or ip_addr.startswith("127."):
+                        continue
 
-                        ip_addr = addr_info.get("addr")
-                        netmask = addr_info.get("netmask")
-                        if not ip_addr or not netmask:
-                            continue
+                    prefix = ip.network_prefix
+                    if not isinstance(prefix, int) or not 0 < prefix <= 32:
+                        continue
 
-                        broadcast = self.calculate_broadcast_address(ip_addr, netmask)
-                        if broadcast and broadcast not in broadcast_addresses:
-                            broadcast_addresses.append(broadcast)
-                except Exception as error:
-                    logger.warning("Error processing interface %s: %s", interface_name, error)
+                    mask_int = (0xFFFFFFFF << (32 - prefix)) & 0xFFFFFFFF
+                    netmask = ".".join(
+                        str((mask_int >> (8 * (3 - i))) & 0xFF) for i in range(4)
+                    )
+
+                    broadcast = self.calculate_broadcast_address(ip_addr, netmask)
+                    if broadcast and broadcast not in broadcast_addresses:
+                        broadcast_addresses.append(broadcast)
         except Exception as error:
             logger.error("Error getting network interfaces: %s", error)
             broadcast_addresses = ["255.255.255.255", "192.168.1.255", "192.168.0.255"]
