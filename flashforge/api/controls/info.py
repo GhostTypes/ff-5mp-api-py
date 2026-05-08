@@ -14,6 +14,14 @@ if TYPE_CHECKING:
     from ...client import FlashForgeClient
 
 
+# Firmware-reported PIDs from FlashForge's /detail endpoint. These are stable
+# identifiers set by firmware, unlike the user-mutable `name` field.
+PID_5M = 35
+PID_5M_PRO = 36
+PID_AD5X = 38
+KNOWN_HTTP_PIDS = {PID_5M, PID_5M_PRO, PID_AD5X}
+
+
 class MachineInfoParser:
     """
     Transforms printer detail data from the API response format into a structured FFMachineInfo object.
@@ -68,8 +76,17 @@ class MachineInfoParser:
                 or len(getattr(getattr(detail, "matl_station_info", None), "slot_infos", []) or []) > 0
             )
             printer_name = getattr(detail, "name", "") or ""
-            is_ad5x = printer_name.upper() == "AD5X" or has_material_station
-            is_pro = "Pro" in printer_name and not is_ad5x
+            pid = getattr(detail, "pid", None)
+
+            if pid in KNOWN_HTTP_PIDS:
+                is_ad5x = pid == PID_AD5X
+                is_pro = pid == PID_5M_PRO
+            else:
+                # Fallback for firmware that doesn't report pid: legacy
+                # name+capability heuristic. Vulnerable to user renames, which
+                # is why pid-based detection is preferred when available.
+                is_ad5x = printer_name.upper() == "AD5X" or has_material_station
+                is_pro = "Pro" in printer_name and not is_ad5x
 
             # Build the FFMachineInfo object
             machine_info = FFMachineInfo(
@@ -107,6 +124,7 @@ class MachineInfoParser:
                 fill_amount=getattr(detail, "fill_amount", 0) or 0,
                 firmware_version=getattr(detail, "firmware_version", "") or "",
                 name=printer_name,
+                pid=pid,
                 is_pro=is_pro,
                 is_ad5x=is_ad5x,
                 nozzle_size=getattr(detail, "nozzle_model", "") or "",

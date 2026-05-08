@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-05-08
+
+### Fixed
+
+- Printer model detection (`is_pro`, `is_ad5x` on `FFMachineInfo`) now reads the firmware-set integer `pid` field on `/detail` instead of string-matching the user-mutable `name` field. Renaming an Adventurer 5M / 5M Pro / AD5X via the LCD or cloud no longer breaks model detection in downstream consumers (Home Assistant, Electron UI, Web UI). Falls back to the legacy name+capability heuristic when `pid` is absent so older firmware still works. Reported in [ff-5mp-hass#13](https://github.com/GhostTypes/ff-5mp-hass/issues/13).
+
+### Added
+
+- `FFMachineInfo.pid: int | None` — the raw firmware PID exposed for consumers that want to do their own model-class gating. Known modern HTTP-capable PIDs: `35` (Adventurer 5M), `36` (5M Pro), `38` (AD5X).
+
 ## [1.2.2] - 2026-04-27
 
 ### Fixed
@@ -147,7 +157,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Type hints for all public APIs
 - Inline code documentation
 
-[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.2.3...HEAD
+[1.2.3]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.2.2...v1.2.3
+[1.2.2]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/GhostTypes/ff-5mp-api-py/releases/tag/v1.1.1

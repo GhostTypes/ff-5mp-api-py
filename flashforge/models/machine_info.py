@@ -324,6 +324,7 @@ class FFMachineInfo(BaseModel):
     fill_amount: float = 0.0
     firmware_version: str = ""
     name: str = ""
+    pid: int | None = None
     is_pro: bool = False
     is_ad5x: bool = False
     nozzle_size: str = ""
