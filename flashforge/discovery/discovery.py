@@ -67,7 +67,23 @@ class PrinterModel(StrEnum):
     ADVENTURER_5M_PRO = "Adventurer5MPro"
     ADVENTURER_4 = "Adventurer4"
     ADVENTURER_3 = "Adventurer3"
+    CREATOR_5 = "Creator5"
+    CREATOR_5_PRO = "Creator5Pro"
     UNKNOWN = "Unknown"
+
+
+# Canonical USB Product IDs (discovery packet offset 0x88) for modern printers.
+# Same value space as the firmware /detail `pid` field and the FlashForge
+# update-checker keys, so it is the authoritative model discriminator -- unlike
+# `product_type` (0x5A02), which only identifies the 5M *family* and cannot tell
+# 5M / 5M Pro / AD5X / Creator 5 apart.
+MODERN_PRODUCT_IDS = {
+    0x0023: PrinterModel.ADVENTURER_5M,
+    0x0024: PrinterModel.ADVENTURER_5M_PRO,
+    0x0026: PrinterModel.AD5X,
+    0x0028: PrinterModel.CREATOR_5,
+    0x0029: PrinterModel.CREATOR_5_PRO,
+}
 
 
 class DiscoveryProtocol(StrEnum):
@@ -439,7 +455,7 @@ class PrinterDiscovery:
         product_type = int.from_bytes(buffer[0x8C:0x8E], byteorder="big")
         event_port = int.from_bytes(buffer[0x8E:0x90], byteorder="big")
         serial_number = buffer[0x92 : 0x92 + 128].decode("utf-8", errors="ignore").split("\x00", 1)[0]
-        model = self.detect_modern_model(name, product_type)
+        model = self.detect_modern_model(name, product_type, product_id)
 
         return DiscoveredPrinter(
             model=model,
@@ -480,17 +496,38 @@ class PrinterDiscovery:
             status=self.map_status_code(status_code),
         )
 
-    def detect_modern_model(self, name: str, product_type: int) -> PrinterModel:
-        """Detect a modern printer model from discovery metadata."""
+    def detect_modern_model(
+        self,
+        name: str,
+        product_type: int,
+        product_id: int | None = None,
+    ) -> PrinterModel:
+        """Detect a modern printer model from discovery metadata.
+
+        Resolution order:
+          1. USB product ID (offset 0x88) -- authoritative, user-immutable, and
+             the only signal that distinguishes 5M / 5M Pro / AD5X / Creator 5.
+          2. product_type 0x5A02 (5M *family*) + name -- fallback for firmware
+             reporting an unknown/zero product ID.
+          3. Name heuristics -- last resort.
+        """
+        # Product ID is authoritative (firmware-set, not user-mutable).
+        if product_id is not None and product_id in MODERN_PRODUCT_IDS:
+            return MODERN_PRODUCT_IDS[product_id]
+
         upper_name = name.upper()
 
-        if upper_name == "AD5X":
-            return PrinterModel.AD5X
-
+        # 0x5A02 identifies the 5M family but not the specific model, so we still
+        # need the name to separate base from Pro.
         if product_type == 0x5A02:
+            if upper_name == "AD5X":
+                return PrinterModel.AD5X
             if "PRO" in upper_name:
                 return PrinterModel.ADVENTURER_5M_PRO
             return PrinterModel.ADVENTURER_5M
+
+        if upper_name == "AD5X":
+            return PrinterModel.AD5X
 
         if "ADVENTURER 5M" in upper_name or "AD5M" in upper_name:
             if "PRO" in upper_name:

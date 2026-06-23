@@ -204,6 +204,24 @@ def test_detect_legacy_model_uses_product_id_fallback():
     assert discovery.detect_legacy_model("Workshop Printer", 0x0008) == PrinterModel.ADVENTURER_3
 
 
+def test_detect_modern_model_prefers_product_id():
+    """Modern detection trusts the USB product ID over the user-mutable name."""
+    discovery = PrinterDiscovery()
+
+    # PID wins even when the name has been changed by the user.
+    assert discovery.detect_modern_model("My Renamed Printer", 0x5A02, 0x0024) == PrinterModel.ADVENTURER_5M_PRO
+    assert discovery.detect_modern_model("My Renamed Printer", 0x5A02, 0x0023) == PrinterModel.ADVENTURER_5M
+    assert discovery.detect_modern_model("whatever", 0x0000, 0x0026) == PrinterModel.AD5X
+
+
+def test_detect_modern_model_detects_creator_5():
+    """Creator 5 / Creator 5 Pro resolve purely from their product IDs."""
+    discovery = PrinterDiscovery()
+
+    assert discovery.detect_modern_model("Creator 5", 0x0000, 0x0028) == PrinterModel.CREATOR_5
+    assert discovery.detect_modern_model("Creator 5 Pro", 0x0000, 0x0029) == PrinterModel.CREATOR_5_PRO
+
+
 def test_map_status_code():
     """Discovery status codes map to the typed enum surface."""
     discovery = PrinterDiscovery()
