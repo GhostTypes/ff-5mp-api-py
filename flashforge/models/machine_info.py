@@ -250,6 +250,17 @@ class FFPrinterDetail(BaseModel):
     nozzle_cnt: int | None = Field(default=None, ge=1, le=4, alias="nozzleCnt")
     nozzle_model: str | None = Field(default=None, alias="nozzleModel")
     nozzle_style: int | None = Field(default=None, ge=0, alias="nozzleStyle")
+    # --- Creator 5 series raw fields ---
+    # Immutable factory model name (e.g. "Creator 5 Pro"); unlike `name` this is
+    # not user-editable. May be absent on older firmware.
+    model: str | None = Field(default=None, alias="model")
+    # Per-tool current nozzle temperatures (one entry per nozzle). Multi-nozzle
+    # Creator 5 series report these; single-nozzle models use rightTemp/leftTemp.
+    nozzle_temps: list[float] | None = Field(default=None, alias="nozzleTemps")
+    # Per-tool target nozzle temperatures (one entry per nozzle).
+    nozzle_target_temps: list[float] | None = Field(default=None, alias="nozzleTargetTemps")
+    # Lidar / first-layer scanner presence flag (1 = present, 0 = absent).
+    lidar: int | None = Field(default=None, ge=0, alias="lidar")
     pid: int | None = Field(default=None, ge=0, alias="pid")
     plat_target_temp: float | None = Field(default=None, ge=-50, le=500, alias="platTargetTemp")
     plat_temp: float | None = Field(default=None, ge=-50, le=500, alias="platTemp")
@@ -327,11 +338,35 @@ class FFMachineInfo(BaseModel):
     pid: int | None = None
     is_pro: bool = False
     is_ad5x: bool = False
+    # Creator 5 / Creator 5 Pro (4-head tool-changer) detection. Drives the
+    # http_only transport decision and Pro-only capabilities (door sensor).
+    is_creator5: bool = False
+    is_creator5_pro: bool = False
+    # Immutable factory model name (e.g. "Creator 5 Pro"). Falls back to a
+    # PID-derived name, then the user-set `name`, when the printer doesn't
+    # report the `model` field.
+    model: str | None = None
     nozzle_size: str = ""
+    # Number of tools/nozzles the printer reports. Creator 5 series = 4
+    # (tool-changer); single-nozzle models = 1. Mirrors len(tool_temps).
+    nozzle_count: int | None = None
 
     # Temperatures
     print_bed: Temperature = Field(default_factory=Temperature)
     extruder: Temperature = Field(default_factory=Temperature)
+    # Heated chamber. Only the Creator 5 series has one; other models report 0/0.
+    chamber: Temperature | None = None
+    # Current/target temperatures for every tool/nozzle. Single-nozzle models
+    # report a 1-element array mirroring `extruder`; Creator 5 series report
+    # one entry per nozzle.
+    tool_temps: list[Temperature] = Field(default_factory=list)
+
+    # Capability flags (presence-derived, never assumed from model family)
+    has_camera: bool = False
+    has_lidar: bool = False
+    # Only true on models with confirmed hardware (Creator 5 Pro). When false,
+    # `door_open` is cosmetic and should not be surfaced.
+    has_door_sensor: bool = False
 
     # Current print stats
     print_duration: int = 0

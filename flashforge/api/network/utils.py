@@ -19,7 +19,7 @@ async def json_from_response(response: aiohttp.ClientResponse) -> dict:
         return await response.json()  # type: ignore[no-any-return]
     except aiohttp.ContentTypeError:
         text = await response.text()
-        return json.loads(text)
+        return json.loads(text)  # type: ignore[no-any-return]
 
 
 class NetworkUtils:

@@ -184,3 +184,55 @@ async def test_home_axes_all():
 
     assert await control.home_axes() is True
     client.tcp_client.home_axes.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_configure_slot_snaps_color_for_creator5():
+    """configure_slot snaps the caller color to the C5 palette (#RRGGBB kept)."""
+    client = _build_client()
+    client.is_creator5 = True
+    client._is_ad5x = False
+    control = Control(client)
+    control.send_control_command = AsyncMock(return_value=True)  # type: ignore[method-assign]
+
+    # Pure red snaps to the palette Red #F82D29 (uppercase, '#' kept).
+    result = await control.configure_slot(2, "PLA", "#FF0000")
+
+    assert result is True
+    control.send_control_command.assert_awaited_once_with(
+        Commands.MATERIAL_STATION_CONFIG_CMD,
+        {"slot": 2, "mt": "PLA", "rgb": "#F82D29"},
+    )
+
+
+@pytest.mark.asyncio
+async def test_configure_slot_strips_hash_for_ad5x():
+    """configure_slot sends freeform hex with the leading '#' stripped for AD5X."""
+    client = _build_client()
+    client._is_ad5x = True
+    client.is_creator5 = False
+    control = Control(client)
+    control.send_control_command = AsyncMock(return_value=True)  # type: ignore[method-assign]
+
+    result = await control.configure_slot(1, "PETG", "#45A8F9")
+
+    assert result is True
+    control.send_control_command.assert_awaited_once_with(
+        Commands.MATERIAL_STATION_CONFIG_CMD,
+        {"slot": 1, "mt": "PETG", "rgb": "45A8F9"},
+    )
+
+
+@pytest.mark.asyncio
+async def test_configure_slot_refused_without_material_station():
+    """configure_slot refuses on a printer without a material station."""
+    client = _build_client()
+    client._is_ad5x = False
+    client.is_creator5 = False
+    control = Control(client)
+    control.send_control_command = AsyncMock(return_value=True)  # type: ignore[method-assign]
+
+    result = await control.configure_slot(1, "PLA", "#FF0000")
+
+    assert result is False
+    control.send_control_command.assert_not_awaited()

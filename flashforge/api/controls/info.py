@@ -2,6 +2,7 @@
 FlashForge Python API - Info Module
 """
 
+import re
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -19,7 +20,25 @@ if TYPE_CHECKING:
 PID_5M = 35
 PID_5M_PRO = 36
 PID_AD5X = 38
-KNOWN_HTTP_PIDS = {PID_5M, PID_5M_PRO, PID_AD5X}
+PID_CREATOR5 = 40
+PID_CREATOR5_PRO = 41
+KNOWN_HTTP_PIDS = {
+    PID_5M,
+    PID_5M_PRO,
+    PID_AD5X,
+    PID_CREATOR5,
+    PID_CREATOR5_PRO,
+}
+
+# Immutable model display names keyed by firmware PID. Used as a fallback for
+# `model` when the printer doesn't report the `model` field (older firmware).
+PID_MODEL_NAMES: dict[int, str] = {
+    PID_5M: "Adventurer 5M",
+    PID_5M_PRO: "Adventurer 5M Pro",
+    PID_AD5X: "AD5X",
+    PID_CREATOR5: "Creator 5",
+    PID_CREATOR5_PRO: "Creator 5 Pro",
+}
 
 
 class MachineInfoParser:
@@ -77,16 +96,73 @@ class MachineInfoParser:
             )
             printer_name = getattr(detail, "name", "") or ""
             pid = getattr(detail, "pid", None)
+            detail_model = getattr(detail, "model", None) or ""
 
             if pid in KNOWN_HTTP_PIDS:
                 is_ad5x = pid == PID_AD5X
                 is_pro = pid == PID_5M_PRO
+                is_creator5 = pid in (PID_CREATOR5, PID_CREATOR5_PRO)
+                is_creator5_pro = pid == PID_CREATOR5_PRO
             else:
                 # Fallback for firmware that doesn't report pid: legacy
                 # name+capability heuristic. Vulnerable to user renames, which
                 # is why pid-based detection is preferred when available.
-                is_ad5x = printer_name.upper() == "AD5X" or has_material_station
-                is_pro = "Pro" in printer_name and not is_ad5x
+                #
+                # IMPORTANT: detect the Creator 5 family *first*. A user-set
+                # name like "Creator 5 Pro" contains "Pro", so a naive
+                # `"Pro" in name` check would mis-classify it as a 5M Pro.
+                is_creator5 = "Creator 5" in printer_name
+                is_creator5_pro = is_creator5 and bool(
+                    re.search(r"Creator 5 Pro", detail_model or printer_name, re.IGNORECASE)
+                )
+                is_ad5x = (
+                    printer_name.upper() == "AD5X" or has_material_station
+                ) and not is_creator5
+                is_pro = "Pro" in printer_name and not is_ad5x and not is_creator5
+
+            # Per-tool temperatures. Creator 5 series report nozzleTemps[] /
+            # nozzleTargetTemps[]; single-nozzle models don't, so fall back to a
+            # 1-element array mirroring the right/main extruder.
+            nozzle_temps = getattr(detail, "nozzle_temps", None)
+            nozzle_target_temps = getattr(detail, "nozzle_target_temps", None)
+            if nozzle_temps:
+                tool_temps = [
+                    Temperature(
+                        current=t or 0.0,
+                        set=(
+                            nozzle_target_temps[i]
+                            if nozzle_target_temps and i < len(nozzle_target_temps)
+                            else 0.0
+                        )
+                        or 0.0,
+                    )
+                    for i, t in enumerate(nozzle_temps)
+                ]
+            else:
+                tool_temps = [
+                    Temperature(
+                        current=getattr(detail, "right_temp", 0) or 0.0,
+                        set=getattr(detail, "right_target_temp", 0) or 0.0,
+                    )
+                ]
+
+            # Capability flags. Derived from presence/value, never assumed from
+            # the model family alone. Only the Creator 5 Pro has a confirmed
+            # door sensor; on every other model `doorStatus` is cosmetic.
+            has_camera = getattr(detail, "camera", None) == 1 or bool(
+                getattr(detail, "camera_stream_url", "") or ""
+            )
+            has_lidar = getattr(detail, "lidar", None) == 1
+            has_door_sensor = is_creator5_pro
+
+            # Immutable model name resolution: prefer the firmware `model`
+            # field, then a PID-derived name, then the user-set name.
+            pid_model_name = PID_MODEL_NAMES.get(pid) if pid is not None else None
+            model_value = detail_model or pid_model_name or printer_name or ""
+
+            # Prefer the firmware-reported nozzle count; fall back to the parsed
+            # per-tool array length so single-nozzle models still report 1.
+            nozzle_count = getattr(detail, "nozzle_cnt", None) or len(tool_temps)
 
             # Build the FFMachineInfo object
             machine_info = FFMachineInfo(
@@ -127,7 +203,11 @@ class MachineInfoParser:
                 pid=pid,
                 is_pro=is_pro,
                 is_ad5x=is_ad5x,
+                is_creator5=is_creator5,
+                is_creator5_pro=is_creator5_pro,
+                model=model_value,
                 nozzle_size=getattr(detail, "nozzle_model", "") or "",
+                nozzle_count=nozzle_count,
                 # Temperatures
                 print_bed=Temperature(
                     current=getattr(detail, "plat_temp", 0) or 0,
@@ -137,6 +217,15 @@ class MachineInfoParser:
                     current=getattr(detail, "right_temp", 0) or 0,
                     set=getattr(detail, "right_target_temp", 0) or 0,
                 ),
+                chamber=Temperature(
+                    current=getattr(detail, "chamber_temp", 0) or 0,
+                    set=getattr(detail, "chamber_target_temp", 0) or 0,
+                ),
+                tool_temps=tool_temps,
+                # Capability flags (presence-derived)
+                has_camera=has_camera,
+                has_lidar=has_lidar,
+                has_door_sensor=has_door_sensor,
                 # Current print stats
                 print_duration=getattr(detail, "print_duration", 0) or 0,
                 print_file_name=getattr(detail, "print_file_name", "") or "",

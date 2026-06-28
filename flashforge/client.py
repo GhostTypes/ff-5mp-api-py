@@ -27,6 +27,10 @@ class FiveMClientConnectionOptions:
     http_port: int | None = None
     tcp_port: int | None = None
     led_control_override: bool | None = None
+    # Force HTTP-only transport (skip the TCP/8899 handshake). Set this for a
+    # Creator 5 / Creator 5 Pro, which exposes no TCP service; otherwise it is
+    # auto-detected from the firmware-reported model after `verify_connection`.
+    http_only: bool | None = None
 
 
 class FlashForgeClient:
@@ -84,6 +88,8 @@ class FlashForgeClient:
         self.printer_name: str = ""
         self.is_pro: bool = False
         self._is_ad5x: bool = False
+        self.is_creator5: bool = False
+        self.is_creator5_pro: bool = False
         self.firmware_version: str = ""
         self.firmware_ver: str = ""
         self.mac_address: str = ""
@@ -106,6 +112,15 @@ class FlashForgeClient:
         )
         self._apply_feature_overrides()
 
+        # Transport selection. Creator 5 / Creator 5 Pro have no TCP/8899
+        # service, so they must run HTTP-only. An explicit override wins;
+        # otherwise http_only is auto-set from the detected model in
+        # `verify_connection` / `cache_details`.
+        self._http_only_override: bool | None = (
+            options.http_only if options and options.http_only is not None else None
+        )
+        self._http_only: bool = bool(self._http_only_override)
+
     @property
     def is_ad5x(self) -> bool:
         """
@@ -115,6 +130,46 @@ class FlashForgeClient:
             True if the printer is AD5X, False otherwise
         """
         return self._is_ad5x
+
+    @property
+    def http_only(self) -> bool:
+        """
+        Indicates whether the client should avoid the TCP transport.
+
+        True for Creator 5 / Creator 5 Pro (no TCP/8899 service) or when an
+        explicit ``http_only`` override was supplied at construction. When True,
+        TCP-only operations are unavailable (see :meth:`can_use_tcp`).
+
+        Returns:
+            True if the client must operate over HTTP only
+        """
+        return self._http_only
+
+    def can_use_tcp(self, op: str = "") -> bool:
+        """
+        Report whether a TCP-backed operation may be attempted.
+
+        Returns False whenever this client is HTTP-only (e.g. a Creator 5 with
+        no TCP/8899 service). TCP-delegating control/temperature methods check
+        this and no-op (return False) instead of hanging on a dead socket.
+
+        Args:
+            op: Optional operation name, included in the warning log.
+
+        Returns:
+            True if TCP operations are permitted, False otherwise
+        """
+        if self._http_only:
+            print(f"{op}() unavailable: printer has no TCP control channel (HTTP-only).")
+            return False
+        return True
+
+    def _update_http_only_from_model(self) -> None:
+        """Recompute ``http_only`` from the detected model unless overridden."""
+        if self._http_only_override is not None:
+            self._http_only = bool(self._http_only_override)
+        else:
+            self._http_only = self.is_creator5 or self.is_creator5_pro
 
     async def __aenter__(self) -> "FlashForgeClient":
         """Async context manager entry."""
@@ -209,11 +264,15 @@ class FlashForgeClient:
         Disposes of the FlashForgeClient instance, stopping keep-alive messages
         and cleaning up resources.
         """
-        # Stop TCP keep-alive and dispose
-        if hasattr(self.tcp_client, "stop_keep_alive"):
-            await self.tcp_client.stop_keep_alive(True)
-        if hasattr(self.tcp_client, "dispose"):
-            await self.tcp_client.dispose()
+        # Stop TCP keep-alive and dispose. An HTTP-only client (e.g. Creator 5,
+        # which has no TCP/8899 service) never opened a TCP socket, so skip the
+        # cleanup handshake -- otherwise the logout send would attempt (and time
+        # out on) a connection that was never established.
+        if not self._http_only:
+            if hasattr(self.tcp_client, "stop_keep_alive"):
+                await self.tcp_client.stop_keep_alive(True)
+            if hasattr(self.tcp_client, "dispose"):
+                await self.tcp_client.dispose()
 
         # Close HTTP session
         if self._http_session and not self._http_session.closed:
@@ -298,6 +357,10 @@ class FlashForgeClient:
         self.camera_stream_url = info.camera_stream_url or ""
         self.lifetime_print_time = info.formatted_total_run_time or ""
         self._is_ad5x = info.is_ad5x
+        self.is_creator5 = info.is_creator5
+        self.is_creator5_pro = info.is_creator5_pro
+        # Refresh transport selection now that the model flags are cached.
+        self._update_http_only_from_model()
 
         # Format filament usage
         filament_value = info.cumulative_filament if info.cumulative_filament is not None else 0.0
@@ -338,15 +401,31 @@ class FlashForgeClient:
                 print("Failed to parse machine info from detail response")
                 return False
 
-            # Get TCP printer information to check for Pro model
-            tcp_info: PrinterInfo | None = await self.tcp_client.get_printer_info()
-            if tcp_info:
-                if "Pro" in tcp_info.type_name and not machine_info.is_pro and not machine_info.is_ad5x:
-                    self.is_pro = True
+            # Detect http_only from the parsed model BEFORE touching TCP. The
+            # Creator 5 / Creator 5 Pro expose no TCP/8899 service, so the M115
+            # handshake would hang until the connect timeout. An explicit
+            # override always wins.
+            if self._http_only_override is not None:
+                self._http_only = bool(self._http_only_override)
             else:
-                print(
-                    "Warning: Unable to get PrinterInfo from TCP API, some features might not work"
-                )
+                self._http_only = machine_info.is_creator5
+
+            # Get TCP printer information to check for Pro model
+            tcp_info: PrinterInfo | None = None
+            if not self._http_only:
+                tcp_info = await self.tcp_client.get_printer_info()
+                if tcp_info:
+                    if (
+                        "Pro" in tcp_info.type_name
+                        and not machine_info.is_pro
+                        and not machine_info.is_ad5x
+                    ):
+                        self.is_pro = True
+                else:
+                    print(
+                        "Warning: Unable to get PrinterInfo from TCP API, "
+                        "some features might not work"
+                    )
 
             # Cache the details
             return self.cache_details(machine_info)

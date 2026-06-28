@@ -18,6 +18,8 @@ from .responses import (
     AD5XMaterialMapping,
     AD5XSingleColorJobParams,
     AD5XUploadParams,
+    Creator5JobParams,
+    Creator5UploadParams,
     DetailResponse,
     FilamentArgs,
     GCodeListResponse,
@@ -46,6 +48,8 @@ __all__ = [
     "AD5XLocalJobParams",
     "AD5XSingleColorJobParams",
     "AD5XUploadParams",
+    "Creator5JobParams",
+    "Creator5UploadParams",
     "GCodeListResponse",
     "ThumbnailResponse",
 ]

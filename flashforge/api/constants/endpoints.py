@@ -1,6 +1,5 @@
 from typing import Final
 
-
 CAMERA_STREAM_PORT: Final[int] = 8080
 
 

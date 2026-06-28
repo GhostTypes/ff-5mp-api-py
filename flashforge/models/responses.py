@@ -164,6 +164,65 @@ class AD5XUploadParams(BaseModel):
     )
 
 
+class Creator5JobParams(BaseModel):
+    """Parameters for starting a Creator 5 / Creator 5 Pro local print job.
+
+    Distinct from the AD5X job params: the Creator 5 maps materials at print-start
+    (POST /printGcode) rather than upload time, so the body carries NO
+    ``useMatlStation`` / ``gcodeToolCnt`` / ``firstLayerInspection`` (the latter
+    doesn't exist on the C5). ``flowCalibration`` and ``timeLapseVideo`` are always
+    present (default False); ``material_mappings`` is optional for a single-tool
+    print.
+    """
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    file_name: str = Field(description="Name of the file on the printer to start")
+    leveling_before_print: bool = Field(
+        description="Whether to perform bed leveling before printing"
+    )
+    flow_calibration: bool = Field(
+        default=False, description="Whether to enable flow calibration"
+    )
+    time_lapse_video: bool = Field(
+        default=False, description="Whether to enable time lapse video recording"
+    )
+    material_mappings: list[AD5XMaterialMapping] | None = Field(
+        default=None,
+        max_length=4,
+        description="Optional per-tool material mappings (1-4 items); omit for single-tool",
+    )
+
+
+class Creator5UploadParams(BaseModel):
+    """Parameters for uploading a file to a Creator 5 / Creator 5 Pro.
+
+    Mirrors the AD5X upload but omits ``firstLayerInspection`` (absent on the C5)
+    and the ``materialMappings`` header (the C5 maps materials at print-start, not
+    upload). The C5 firmware checks the booleans as the string "true"/"false".
+    """
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    file_path: str = Field(description="Local file path to upload")
+    start_print: bool = Field(description="Whether to start printing immediately after upload")
+    leveling_before_print: bool = Field(
+        description="Whether to perform bed leveling before printing"
+    )
+    flow_calibration: bool = Field(
+        default=False, description="Whether to enable flow calibration"
+    )
+    time_lapse_video: bool = Field(
+        default=False, description="Whether to enable time lapse video recording"
+    )
+    use_matl_station: bool = Field(
+        description="Whether this is a multi-tool material-station job"
+    )
+    gcode_tool_cnt: int = Field(
+        ge=1, le=4, description="Number of tools in the G-code (1-4 for the C5)"
+    )
+
+
 class GCodeListResponse(GenericResponse):
     """Represents the response structure for a G-code file list request."""
 

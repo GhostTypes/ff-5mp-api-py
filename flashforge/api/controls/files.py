@@ -35,10 +35,18 @@ class Files:
         """
         Retrieves a list of files stored locally on the printer.
 
+        HTTP-only printers (Creator 5 / 5 Pro) have no TCP/8899 file-listing
+        channel, so this falls back to the HTTP ``/gcodeList`` recent-file list
+        (mirroring ``Files.ts``) instead of hanging on a dead TCP socket.
+
         Returns:
             A list of file names, or empty list if retrieval fails.
         """
-        # This method uses the TCP client to get file list
+        if self.client.http_only:
+            entries = await self.get_recent_file_list()
+            return [e.gcode_file_name for e in entries if e.gcode_file_name]
+
+        # Legacy / 5M-family printers expose the file list over TCP.
         if hasattr(self.client, "tcp_client") and self.client.tcp_client:
             return await self.client.tcp_client.get_file_list_async()
         return []
@@ -46,6 +54,9 @@ class Files:
     async def get_local_file_list(self) -> list[str]:
         """
         Retrieves a list of files stored locally on the printer.
+
+        HTTP-only printers (Creator 5 / 5 Pro) have no TCP/8899 file-listing
+        channel; see :meth:`get_file_list` for the HTTP fallback.
 
         Returns:
             A list of file names, or empty list if retrieval fails.

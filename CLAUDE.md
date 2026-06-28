@@ -84,7 +84,7 @@ flashforge/
 
 **Dual Protocol Strategy**: HTTP is used for high-level operations (printer status, file listing, job control commands) while TCP/G-code is used for real-time operations (temperature monitoring via M105, print progress via M27, thumbnails via M662).
 
-**Model Detection**: The client sets `_is_ad5x` flag by checking printer name for "5M" or "5X" which enables/disables certain API features (LED control, camera, filtration).
+**Model Detection**: `MachineInfoParser.from_detail()` derives `is_pro` / `is_ad5x` on `FFMachineInfo` from the firmware-set integer `pid` field on `/detail` (35 = Adventurer 5M, 36 = 5M Pro, 38 = AD5X — see `KNOWN_HTTP_PIDS` in `flashforge/api/controls/info.py`). The `pid` value is also passed through to `FFMachineInfo.pid` for downstream consumers. When `pid` is absent (older firmware) the parser falls back to a name+capability heuristic, but new code should NOT rely on substring-matching `detail.name` — that field is user-mutable via the printer's LCD or cloud account and changing it broke detection in pre-1.2.3 builds (see CHANGELOG entry for 1.2.3, ref `ff-5mp-hass#13`).
 
 **Parser Pattern**: TCP responses are parsed by specialized parser classes in `tcp/parsers/` that extract structured data from text responses (e.g., `M105` returns text like `T0:25/0 T1:25/0 B:25/0` which TempInfo parses).
 
@@ -269,6 +269,15 @@ async with FlashForgeClient(ip, serial, check) as client:
 Certain features only work on specific models:
 - **LED control**: Adventurer 5M/5X only (check `client.led_control`)
 - **Filtration**: Adventurer 5M Pro only (check `client.filtration_control`)
+
+Capability flags (`client.is_pro`, `client.is_ad5x`) are populated from `FFMachineInfo` after `verify_connection()`, which itself reads `pid` off `/detail`. Trust those flags — do not re-derive them from `info.name`.
+
+### Why TCP Bootstrap Is Still Required for Modern Printers
+The HTTP `/detail` endpoint requires authentication (`serialNumber` + `checkCode` via `FNetCode`). During discovery and the very first connection attempt — before a check code has been entered — there are no credentials, so the parser cannot read `pid` from `/detail`. The library handles this by:
+
+1. Discovery (UDP) returns the printer's USB-style PID in the broadcast packet, which `discovery/discovery.py` already maps to a `PrinterModel`. Consumers can use this to pre-select a model class before pairing.
+2. After a check code is provided, `client.initialize()` performs both an authenticated `/detail` call and an unauthenticated TCP `M115` (`tcp_client.get_printer_info()`). The TCP `M115` response carries `Machine Type` (firmware-controlled, e.g. `"FlashForge Adventurer 5M Pro"`) which is safe to substring-match for capability inference; do NOT use the M115 `Machine Name` field for that — like `detail.name` it is user-set.
+3. Once `verify_connection()` finishes, `FFMachineInfo.pid` / `is_pro` / `is_ad5x` are authoritative. All later capability gating should read those, not re-parse strings.
 
 ### Error Handling
 - HTTP errors: Wrapped in aiohttp exceptions

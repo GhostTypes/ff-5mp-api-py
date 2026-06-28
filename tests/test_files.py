@@ -191,6 +191,40 @@ async def test_get_local_file_list_empty():
 
 
 @pytest.mark.asyncio
+async def test_get_file_list_http_only_falls_back_to_recent_list():
+    """HTTP-only printers (Creator 5 / 5 Pro) have no TCP/8899 file channel.
+
+    get_file_list falls back to the HTTP /gcodeList recent-file list and never
+    touches the (dead) TCP socket, mirroring Files.ts.
+    """
+    client = _build_client()
+    client._http_only = True  # noqa: SLF001 - test-only transport override
+    mock_session = _mock_session(FILE_LIST_AD5X_RESPONSE)
+
+    with patch("aiohttp.ClientSession", return_value=mock_session):
+        with patch("flashforge.api.controls.files.NetworkUtils.is_ok", return_value=True):
+            result = await client.files.get_file_list()
+
+    assert result == ["multi_color_test.3mf"]
+    # The TCP file-listing path must never be reached on an HTTP-only printer.
+    client.tcp_client.get_file_list_async.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_get_local_file_list_http_only_falls_back_to_recent_list():
+    """get_local_file_list shares the http-only HTTP fallback."""
+    client = _build_client()
+    client._http_only = True  # noqa: SLF001 - test-only transport override
+    mock_session = _mock_session(FILE_LIST_AD5X_RESPONSE)
+
+    with patch("aiohttp.ClientSession", return_value=mock_session):
+        with patch("flashforge.api.controls.files.NetworkUtils.is_ok", return_value=True):
+            result = await client.files.get_local_file_list()
+
+    assert result == ["multi_color_test.3mf"]
+    client.tcp_client.get_file_list_async.assert_not_called()
+
+@pytest.mark.asyncio
 async def test_get_gcode_thumbnail_success():
     """Thumbnail retrieval returns decoded bytes."""
     client = _build_client()

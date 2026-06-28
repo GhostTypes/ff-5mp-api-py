@@ -33,6 +33,12 @@ The TypeScript library intentionally includes its own TypeScript-shaped surface:
 - `PrinterDiscovery` as the primary discovery entry point
 - fewer high-level convenience wrappers on the top-level client
 
+## Known Divergences
+
+These are deliberate, documented differences from the TypeScript wire behavior:
+
+- **`set_chamber_temp` / `cancel_chamber_temp` are Creator 5-only.** The TypeScript client sends the chamber temperature command unconditionally (printers without a chamber heater ignore the field). The Python client gates these methods to Creator 5 / Creator 5 Pro and returns `False` otherwise, since only the Creator 5 family has a chamber heater. Practical impact on other models is near-zero.
+
 ## Guidance
 
 - Prefer `PrinterDiscovery` for new code in both languages.

@@ -8,6 +8,7 @@ from ...models.responses import FilamentArgs
 from ..constants.commands import Commands
 from ..constants.endpoints import Endpoints
 from ..network.utils import NetworkUtils, json_from_response
+from .creator5_palette import snap_to_creator5_palette
 
 if TYPE_CHECKING:
     from ...client import FlashForgeClient
@@ -43,8 +44,11 @@ class Control:
         Homes the X, Y, and Z axes of the printer.
 
         Returns:
-            True if the command is successful, False otherwise.
+            True if the command is successful, False otherwise (including when the
+            printer has no TCP control channel, e.g. Creator 5).
         """
+        if not self.client.can_use_tcp("home_axes"):
+            return False
         return await self.tcp_client.home_axes()
 
     async def home_axes_rapid(self) -> bool:
@@ -52,8 +56,11 @@ class Control:
         Performs a rapid homing of the X, Y, and Z axes.
 
         Returns:
-            True if the command is successful, False otherwise.
+            True if the command is successful, False otherwise (including when the
+            printer has no TCP control channel, e.g. Creator 5).
         """
+        if not self.client.can_use_tcp("home_axes_rapid"):
+            return False
         return await self.tcp_client.rapid_home()
 
     async def set_external_filtration_on(self) -> bool:
@@ -202,8 +209,11 @@ class Control:
         Turns on the filament runout sensor.
 
         Returns:
-            True if the command is successful, False otherwise.
+            True if the command is successful, False otherwise (including when the
+            printer has no TCP control channel, e.g. Creator 5).
         """
+        if not self.client.can_use_tcp("turn_runout_sensor_on"):
+            return False
         return await self.tcp_client.turn_runout_sensor_on()
 
     async def turn_runout_sensor_off(self) -> bool:
@@ -211,9 +221,60 @@ class Control:
         Turns off the filament runout sensor.
 
         Returns:
+            True if the command is successful, False otherwise (including when the
+            printer has no TCP control channel, e.g. Creator 5).
+        """
+        if not self.client.can_use_tcp("turn_runout_sensor_off"):
+            return False
+        return await self.tcp_client.turn_runout_sensor_off()
+
+    async def configure_slot(self, slot: int, material_name: str, hex_rgb: str) -> bool:
+        """
+        Configures the material name and color metadata for a material-station slot.
+        This information is shown on the printer UI and used for print validation; it
+        does not move any filament. Available on the AD5X and the Creator 5 / Creator 5 Pro.
+
+        The ``msConfig_cmd`` handler is firmware-confirmed present on the Creator 5
+        (Ghidra RE of ``firmwareExe`` 1.9.2). The Creator 5 has no removable IFS; it
+        surfaces its 4 tool heads as the 4 "slots", so this sets per-tool material
+        metadata. Both models share the same ``OrcaServer`` command path and wire
+        format. Note that **filament load/unload (``slotAction`` / ``ms_cmd``)
+        remains AD5X-only** — the Creator 5 firmware has no ``ms_cmd``.
+
+        The firmware accepts arbitrary material strings, but the two models render
+        the slot color icon differently:
+
+         - AD5X: accepts freeform hex (the leading "#" is stripped before sending).
+         - Creator 5 / 5 Pro: renders an icon ONLY when ``rgb`` is a byte-for-byte,
+           case-sensitive match against the firmware's 24-entry palette (WITH the
+           "#"); any other value falls back to White. This method snaps the
+           caller's color to the nearest palette entry automatically for the Creator 5.
+
+        Args:
+            slot: The slot number (1-4).
+            material_name: The material type (e.g., "PLA", "PETG").
+            hex_rgb: The color as a hex string.
+
+        Returns:
             True if the command is successful, False otherwise.
         """
-        return await self.tcp_client.turn_runout_sensor_off()
+        if not self.client.is_ad5x and not self.client.is_creator5:
+            print("configure_slot() error, material station only available on AD5X / Creator 5.")
+            return False
+        # The AD5X and Creator 5 use MUTUALLY EXCLUSIVE color wire formats (see
+        # creator5_palette for the firmware match rules), so model-gate here:
+        #  - AD5X: freeform hex, the leading "#" stripped ("RRGGBB"). Unchanged.
+        #  - Creator 5 / 5 Pro: the firmware renders an icon ONLY on a byte-for-byte
+        #    match against its 24-entry palette (case-sensitive, WITH the "#"). Snap
+        #    the caller's color to the nearest palette entry in uppercase "#RRGGBB".
+        if self.client.is_creator5:
+            rgb = snap_to_creator5_palette(hex_rgb).hex
+        else:
+            rgb = hex_rgb[1:] if hex_rgb.startswith("#") else hex_rgb
+        return await self.send_control_command(
+            Commands.MATERIAL_STATION_CONFIG_CMD,
+            {"slot": slot, "mt": material_name, "rgb": rgb},
+        )
 
     async def send_control_command(self, command: str, args: dict[str, Any]) -> bool:
         """

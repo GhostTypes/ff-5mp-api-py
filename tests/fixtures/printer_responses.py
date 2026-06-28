@@ -71,6 +71,76 @@ FIVE_M_PRO_INFO_RESPONSE = {
     },
 }
 
+# Creator 5 / Creator 5 Pro (/detail) payloads. The Creator 5 series is a
+# 4-head tool-changer with no TCP/8899 service: it reports per-nozzle
+# temperature arrays, an immutable factory `model`, and presence flags for
+# the camera / lidar. Only the Pro variant (pid 41) has a real door sensor.
+CREATOR_5_INFO_RESPONSE = {
+    "code": 0,
+    "detail": {
+        "name": "Creator 5",
+        "model": "Creator 5",
+        "pid": 40,
+        "firmwareVersion": "1.0.5",
+        "ipAddr": "192.168.1.150",
+        "macAddr": "AA:BB:CC:00:00:01",
+        "status": "ready",
+        "nozzleCnt": 4,
+        "nozzleTemps": [200.0, 200.0, 200.0, 200.0],
+        "nozzleTargetTemps": [210.0, 210.0, 210.0, 210.0],
+        "rightTemp": 200,
+        "rightTargetTemp": 210,
+        "platTemp": 60,
+        "platTargetTemp": 70,
+        "chamberTemp": 45,
+        "chamberTargetTemp": 50,
+        "camera": 1,
+        "lidar": 1,
+        "doorStatus": "close",
+        "autoShutdown": "close",
+        "externalFanStatus": "open",
+        "internalFanStatus": "close",
+        "lightStatus": "open",
+        "cumulativePrintTime": 800,
+        "cumulativeFilament": 99.0,
+        "printProgress": 0.0,
+    },
+}
+
+CREATOR_5_PRO_INFO_RESPONSE = {
+    "code": 0,
+    "detail": {
+        "name": "Creator 5 Pro",
+        "model": "Creator 5 Pro",
+        "pid": 41,
+        "firmwareVersion": "1.0.5",
+        "ipAddr": "192.168.1.151",
+        "macAddr": "AA:BB:CC:00:00:02",
+        "status": "printing",
+        "nozzleCnt": 4,
+        "nozzleTemps": [195.0, 200.0, 205.0, 210.0],
+        "nozzleTargetTemps": [205.0, 210.0, 210.0, 215.0],
+        "rightTemp": 195,
+        "rightTargetTemp": 205,
+        "platTemp": 65,
+        "platTargetTemp": 75,
+        "chamberTemp": 50,
+        "chamberTargetTemp": 60,
+        "camera": 1,
+        "lidar": 1,
+        "doorStatus": "open",
+        "cameraStreamUrl": "",
+        "estimatedTime": 3600,
+        "printDuration": 600,
+        "printProgress": 0.5,
+        "estimatedRightLen": 5000,
+        "estimatedRightWeight": 200,
+        "printLayer": 50,
+        "targetPrintLayer": 100,
+        "printFileName": "multi_tool_benchy.3mf",
+    },
+}
+
 FILE_LIST_AD5X_RESPONSE = {
     "code": 0,
     "gcodeListDetail": [
