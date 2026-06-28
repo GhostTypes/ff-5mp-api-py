@@ -206,7 +206,7 @@ twine check dist/*
 ```
 
 **Version Management**:
-- Current version: **1.0.2** (as of 2025-12-26)
+- Current version: **1.3.0** (as of 2026-06-28)
 - Package name: `flashforge-python-api`
 - PyPI: https://pypi.org/project/flashforge-python-api/
 - Build system: Hatchling (defined in `pyproject.toml`)
