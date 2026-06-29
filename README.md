@@ -9,6 +9,8 @@ Python library for controlling FlashForge 3D printers with async support for the
 | Adventurer 5M | Full |
 | Adventurer 5M Pro | Full |
 | AD5X | Full |
+| Creator 5 | Full (HTTP-only) |
+| Creator 5 Pro | Full (HTTP-only) |
 | Adventurer 3 / 4 | Dedicated TCP clients |
 
 ## Installation
@@ -90,9 +92,9 @@ asyncio.run(main())
 - printer status and machine information
 - job control
 - file listing, uploads, and thumbnails
-- temperature and motion control
+- temperature and motion control, including per-nozzle and chamber temperature control (Creator 5)
 - LED, camera, and filtration control where supported
-- AD5X-specific job and material-station support
+- AD5X and Creator 5 / Creator 5 Pro material-station, slot configuration, and material mapping
 
 ## Documentation
 

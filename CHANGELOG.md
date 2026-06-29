@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-06-28
+
+### Fixed
+
+- **README "Supported Printers" table now lists the Creator 5 and Creator 5 Pro** that shipped in 1.3.0 (the table predated the Creator 5 work and omitted them). The Capabilities section now also reflects per-nozzle and chamber temperature control and the shared AD5X / Creator 5 material-station surface.
+
 ## [1.3.0] - 2026-06-28
 
 ### Added
@@ -179,7 +185,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Type hints for all public APIs
 - Inline code documentation
 
-[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.2.3...v1.3.0
 [1.2.3]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.2.1...v1.2.2
