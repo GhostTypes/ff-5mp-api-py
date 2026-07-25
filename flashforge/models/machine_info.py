@@ -158,7 +158,11 @@ class FFGcodeToolData(BaseModel):
 class FFGcodeFileEntry(BaseModel):
     """Represents a single G-code file entry as returned by the /gcodeList endpoint, especially for printers like AD5X that provide detailed material info."""
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    # `extra="allow"`, matching FFPrinterDetail: a firmware update that adds one
+    # field must not fail validation, because Files.get_recent_file_list falls
+    # back to a names-only list when it does - silently dropping print time,
+    # filament weight, and the per-tool material data for EVERY file.
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     gcode_file_name: str = Field(
         alias="gcodeFileName", description="The name of the G-code file (e.g., 'FISH_PLA.3mf')"

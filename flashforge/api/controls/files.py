@@ -3,6 +3,7 @@ FlashForge Python API - Files Module
 """
 
 import base64
+import logging
 from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
@@ -14,6 +15,8 @@ from ..network.utils import NetworkUtils, json_from_response
 
 if TYPE_CHECKING:
     from ...client import FlashForgeClient
+
+logger = logging.getLogger(__name__)
 
 
 class Files:
@@ -93,7 +96,18 @@ class Files:
                 # Parse the response using GCodeListResponse
                 try:
                     result = GCodeListResponse(**data)
-                except ValidationError:
+                except ValidationError as err:
+                    # The names-only fallback below silently costs the caller
+                    # every per-file field, which is indistinguishable from a
+                    # printer that only reports names. Say so, loudly enough to
+                    # reach an integration's log, or the next model that changes
+                    # this payload looks like it reports no metadata at all.
+                    logger.warning(
+                        "Could not parse the /gcodeList response; falling back to file "
+                        "names only, so print time, filament weight, and per-tool "
+                        "material data are unavailable for every file. %s",
+                        err,
+                    )
                     raw_list = data.get("gcodeList", [])
                     if isinstance(raw_list, list):
                         entries: list[FFGcodeFileEntry] = []

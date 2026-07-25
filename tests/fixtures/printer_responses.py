@@ -174,6 +174,34 @@ FILE_LIST_5M_PRO_RESPONSE = {
     "gcodeList": ["benchy.gcode", "calibration_cube.gcode"],
 }
 
+# The AD5X payload as a firmware update might one day send it: same data, plus a
+# field this library has never heard of, at both the response and the entry level.
+# The models must absorb those rather than fail validation - a failure here drops
+# the caller to a names-only list and loses the metadata for every file, which is
+# indistinguishable from a printer that genuinely reports names only.
+FILE_LIST_AD5X_UNKNOWN_FIELD_RESPONSE = {
+    "code": 0,
+    "someFutureListField": "unrecognized",
+    "gcodeListDetail": [
+        {
+            "gcodeFileName": "multi_color_test.3mf",
+            "printingTime": 1800,
+            "gcodeToolCnt": 2,
+            "gcodeToolDatas": [
+                {
+                    "toolId": 0,
+                    "slotId": 1,
+                    "materialName": "PLA",
+                    "materialColor": "#FF0000",
+                    "filamentWeight": 15.5,
+                },
+            ],
+            "useMatlStation": True,
+            "someFutureEntryField": 42,
+        }
+    ],
+}
+
 THUMBNAIL_RESPONSE = {
     "code": 0,
     "imageData": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=",
