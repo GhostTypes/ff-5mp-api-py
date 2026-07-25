@@ -124,9 +124,8 @@ async def test_upload_file_success(tmp_path: Path):
     file_data = b"G28\nG1 X10 Y10\nM104 S200\n"
     local_file.write_bytes(file_data)
 
-    start_command = (
-        GCodes.CMD_PREP_FILE_UPLOAD.replace("%%size%%", str(len(file_data)))
-        .replace("%%filename%%", "test-upload.gcode")
+    start_command = GCodes.CMD_PREP_FILE_UPLOAD.replace("%%size%%", str(len(file_data))).replace(
+        "%%filename%%", "test-upload.gcode"
     )
     client = _create_upload_client(
         {
@@ -155,9 +154,8 @@ async def test_upload_file_normalizes_legacy_remote_paths(tmp_path: Path):
     file_data = b"M105\n"
     local_file.write_bytes(file_data)
 
-    start_command = (
-        GCodes.CMD_PREP_FILE_UPLOAD.replace("%%size%%", str(len(file_data)))
-        .replace("%%filename%%", "renamed.gx")
+    start_command = GCodes.CMD_PREP_FILE_UPLOAD.replace("%%size%%", str(len(file_data))).replace(
+        "%%filename%%", "renamed.gx"
     )
     client = _create_upload_client(
         {
@@ -179,9 +177,8 @@ async def test_upload_file_fails_on_m29_error(tmp_path: Path):
     file_data = b"G1 X5 Y5\n"
     local_file.write_bytes(file_data)
 
-    start_command = (
-        GCodes.CMD_PREP_FILE_UPLOAD.replace("%%size%%", str(len(file_data)))
-        .replace("%%filename%%", "broken-upload.gcode")
+    start_command = GCodes.CMD_PREP_FILE_UPLOAD.replace("%%size%%", str(len(file_data))).replace(
+        "%%filename%%", "broken-upload.gcode"
     )
     client = _create_upload_client(
         {

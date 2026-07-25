@@ -4,7 +4,6 @@ Tests for NetworkUtils class.
 These tests validate the utility methods used for handling network responses.
 """
 
-
 from flashforge.api.network.utils import NetworkUtils
 from flashforge.models.responses import GenericResponse
 
@@ -54,6 +53,7 @@ class TestNetworkUtilsIsOk:
 
     def test_handles_object_without_code_attribute(self):
         """Test objects without code attribute default to False."""
+
         class MockResponse:
             def __init__(self):
                 self.message = "No code attribute"
@@ -82,6 +82,7 @@ class TestNetworkUtilsGetErrorMessage:
 
     def test_returns_unknown_error_for_object_without_message(self):
         """Test that object without message attribute returns 'Unknown error'."""
+
         class MockResponse:
             def __init__(self):
                 self.code = 1

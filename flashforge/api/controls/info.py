@@ -98,7 +98,8 @@ class MachineInfoParser:
             has_material_station = (
                 getattr(detail, "has_matl_station", None) is True
                 or (getattr(getattr(detail, "matl_station_info", None), "slot_cnt", 0) or 0) > 0
-                or len(getattr(getattr(detail, "matl_station_info", None), "slot_infos", []) or []) > 0
+                or len(getattr(getattr(detail, "matl_station_info", None), "slot_infos", []) or [])
+                > 0
             )
             printer_name = getattr(detail, "name", "") or ""
             pid = getattr(detail, "pid", None)
@@ -242,7 +243,9 @@ class MachineInfoParser:
                 print_speed_adjust=getattr(detail, "print_speed_adjust", 0) or 0,
                 filament_type=getattr(detail, "right_filament_type", "") or "",
                 # Machine state
-                machine_state=MachineInfoParser._get_machine_state(getattr(detail, "status", "") or ""),
+                machine_state=MachineInfoParser._get_machine_state(
+                    getattr(detail, "status", "") or ""
+                ),
                 status=getattr(detail, "status", "") or "",
                 total_print_layers=getattr(detail, "target_print_layer", 0) or 0,
                 tvoc=getattr(detail, "tvoc", 0) or 0,

@@ -127,7 +127,9 @@ class TempInfo:
             return None
 
         try:
-            lines = [line.strip() for line in replay.replace("\r", "\n").split("\n") if line.strip()]
+            lines = [
+                line.strip() for line in replay.replace("\r", "\n").split("\n") if line.strip()
+            ]
             if not lines:
                 logger.error("TempInfo replay has invalid data: %s", replay)
                 return None

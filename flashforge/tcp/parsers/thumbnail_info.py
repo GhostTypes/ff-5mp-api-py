@@ -50,7 +50,7 @@ class ThumbnailInfo:
                 return None
 
             binary_buffer = replay.encode("latin1")
-            magic_marker = b"\xA2\xA2\x2A\x2A"
+            magic_marker = b"\xa2\xa2\x2a\x2a"
             magic_offset = binary_buffer.find(magic_marker)
             if magic_offset >= 0 and len(binary_buffer) >= magic_offset + 8:
                 payload_length = int.from_bytes(

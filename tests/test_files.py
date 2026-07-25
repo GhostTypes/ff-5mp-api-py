@@ -279,6 +279,7 @@ async def test_get_local_file_list_http_only_falls_back_to_recent_list():
     assert result == ["multi_color_test.3mf"]
     client.tcp_client.get_file_list_async.assert_not_called()
 
+
 @pytest.mark.asyncio
 async def test_get_gcode_thumbnail_success():
     """Thumbnail retrieval returns decoded bytes."""

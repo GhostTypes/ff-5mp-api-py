@@ -270,9 +270,7 @@ class TempControl:
             True if the command is acknowledged, False otherwise.
         """
         if not self.client.is_creator5 and not self.client.is_creator5_pro:
-            print(
-                "cancel_chamber_temp() error, chamber heater only available on Creator 5 series."
-            )
+            print("cancel_chamber_temp() error, chamber heater only available on Creator 5 series.")
             return False
         return await self._send_http_temp_command(chamber=TEMP_OFF)
 

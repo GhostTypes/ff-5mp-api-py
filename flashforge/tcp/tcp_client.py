@@ -150,10 +150,9 @@ class FlashForgeTcpClient:
             logger.error("Upload failed: remote file name resolved to an empty value.")
             return False
 
-        start_command = (
-            GCodes.CMD_PREP_FILE_UPLOAD.replace("%%size%%", str(file_path.stat().st_size))
-            .replace("%%filename%%", normalized_file_name)
-        )
+        start_command = GCodes.CMD_PREP_FILE_UPLOAD.replace(
+            "%%size%%", str(file_path.stat().st_size)
+        ).replace("%%filename%%", normalized_file_name)
 
         async with self._socket_lock:
             try:
@@ -184,7 +183,9 @@ class FlashForgeTcpClient:
                     GCodes.CMD_COMPLETE_FILE_UPLOAD
                 )
                 if not finish_response:
-                    logger.error("Upload failed: printer did not respond to M29 upload finalization.")
+                    logger.error(
+                        "Upload failed: printer did not respond to M29 upload finalization."
+                    )
                     return False
 
                 return self._is_successful_upload_boundary_response(

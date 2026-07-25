@@ -186,9 +186,9 @@ class TestFormatScientificNotation:
 
         for num in normal_numbers:
             result = format_scientific_notation(num)
-            assert "e" not in result.lower(), (
-                f"Number {num} should use standard format, got: {result}"
-            )
+            assert (
+                "e" not in result.lower()
+            ), f"Number {num} should use standard format, got: {result}"
 
     def test_various_scientific_numbers(self):
         """Test various numbers that should use scientific notation"""
@@ -196,9 +196,9 @@ class TestFormatScientificNotation:
 
         for num in scientific_numbers:
             result = format_scientific_notation(num)
-            assert "e" in result.lower(), (
-                f"Number {num} should use scientific format, got: {result}"
-            )
+            assert (
+                "e" in result.lower()
+            ), f"Number {num} should use scientific format, got: {result}"
 
 
 class TestFNetCode:

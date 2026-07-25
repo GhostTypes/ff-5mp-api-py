@@ -208,9 +208,9 @@ class TestMaterialMappingValidation:
                     slot_material_color="#000000",
                 )
             ]
-            assert self.job_control._validate_material_mappings(mappings) is True, (
-                f"Should accept color: {color}"
-            )
+            assert (
+                self.job_control._validate_material_mappings(mappings) is True
+            ), f"Should accept color: {color}"
 
 
 class TestBase64Encoding:

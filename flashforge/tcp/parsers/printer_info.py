@@ -70,7 +70,9 @@ class PrinterInfo:
             return None
 
         try:
-            lines = [line.strip() for line in replay.replace("\r", "\n").split("\n") if line.strip()]
+            lines = [
+                line.strip() for line in replay.replace("\r", "\n").split("\n") if line.strip()
+            ]
 
             for line in lines:
                 if line.startswith("Machine Type:"):

@@ -48,7 +48,9 @@ class PrintStatus:
             self.sd_total = ""
             self.layer_current = ""
             self.layer_total = ""
-            lines = [line.strip() for line in replay.replace("\r", "\n").split("\n") if line.strip()]
+            lines = [
+                line.strip() for line in replay.replace("\r", "\n").split("\n") if line.strip()
+            ]
 
             for line in lines:
                 if "SD printing byte " in line:
