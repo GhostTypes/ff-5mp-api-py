@@ -160,6 +160,19 @@ CREATOR_5_PRO_MATL_STATION_INFO = {
     "stateStep": 0,
 }
 
+# The same Creator 5 Pro material station, plus fields a firmware update might
+# add at the station and slot level. FFPrinterDetail allows extras, but that is
+# not sufficient on its own: a *child* model that forbids them fails validation
+# for the whole /detail response, which Info.get_detail_response swallows into
+# a None return.
+CREATOR_5_PRO_MATL_STATION_UNKNOWN_FIELD = {
+    **CREATOR_5_PRO_MATL_STATION_INFO,
+    "someFutureStationField": "unrecognized",
+    "slotInfos": [
+        {**slot, "someFutureSlotField": 42} for slot in CREATOR_5_PRO_MATL_STATION_INFO["slotInfos"]
+    ],
+}
+
 FILE_LIST_AD5X_RESPONSE = {
     "code": 0,
     "gcodeListDetail": [
@@ -235,6 +248,20 @@ PRODUCT_RESPONSE = {
         "chamberTempCtrlState": 1,
         "nozzleTempCtrlState": 1,
         "platformTempCtrlState": 1,
+    },
+}
+
+# The /product payload as a firmware update might one day send it: the same
+# control states, plus keys this library has never seen, at both the envelope
+# and the nested `product` level. These must be absorbed rather than fail
+# validation - send_product_command has no fallback, so a failure returns False,
+# which every caller reads as the printer rejecting the check code.
+PRODUCT_RESPONSE_UNKNOWN_FIELD = {
+    "code": 0,
+    "someFutureEnvelopeField": "unrecognized",
+    "product": {
+        **PRODUCT_RESPONSE["product"],
+        "someFutureCtrlState": 1,
     },
 }
 

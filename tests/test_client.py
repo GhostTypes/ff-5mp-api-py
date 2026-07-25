@@ -3,6 +3,7 @@ Unit tests for the main FlashForgeClient class.
 """
 
 import asyncio
+import logging
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -19,6 +20,7 @@ from tests.fixtures.printer_responses import (
     AD5X_INFO_RESPONSE,
     FIVE_M_PRO_INFO_RESPONSE,
     PRODUCT_RESPONSE,
+    PRODUCT_RESPONSE_UNKNOWN_FIELD,
 )
 
 
@@ -259,6 +261,59 @@ async def test_send_product_command_stores_product_info_and_control_states():
     assert client.product_info.lightCtrlState == 1
     assert client.led_control is True
     assert client.filtration_control is True
+
+
+@pytest.mark.asyncio
+async def test_send_product_command_accepts_a_payload_with_unknown_fields():
+    """An unrecognized field must not read as a rejected check code.
+
+    Regression test for ff-5mp-hass#18: Product and ProductResponse were
+    extra="forbid", so one unknown key raised ValidationError, which
+    send_product_command caught and reported as a bare False - identical to the
+    printer refusing the credentials. The HA config flow turns that False into
+    "the check code is incorrect", so a firmware addition here presented to the
+    user as a wrong check code that the slicer accepted fine.
+    """
+    client = FlashForgeClient("192.168.1.120", "SN123", "CODE123")
+    client._ensure_http_session = AsyncMock(
+        return_value=_mock_http_session(PRODUCT_RESPONSE_UNKNOWN_FIELD)
+    )
+
+    result = await client.send_product_command()
+
+    assert result is True
+    assert client.product_info is not None
+    # The known control states survive alongside the unknown one.
+    assert client.product_info.lightCtrlState == 1
+    assert client.led_control is True
+    assert client.filtration_control is True
+
+
+@pytest.mark.asyncio
+async def test_send_product_command_logs_when_the_response_cannot_be_parsed(caplog):
+    """A genuine parse failure must say so rather than fail silently.
+
+    Now that extras are allowed, the remaining ways to fail validation are a
+    missing required field or a wrong type - here, a `product` block with no
+    `lightCtrlState`. The response still has to pass `NetworkUtils.is_ok` to
+    reach validation at all, so `code` stays 0: a non-zero code is a real
+    rejection and returns False earlier, without reaching this path. The return
+    value is indistinguishable from rejected credentials either way, which makes
+    the log line the only signal of what actually went wrong.
+    """
+    client = FlashForgeClient("192.168.1.120", "SN123", "CODE123")
+    incomplete_product = {
+        key: value for key, value in PRODUCT_RESPONSE["product"].items() if key != "lightCtrlState"
+    }
+    client._ensure_http_session = AsyncMock(
+        return_value=_mock_http_session({"code": 0, "product": incomplete_product})
+    )
+
+    with caplog.at_level(logging.WARNING, logger="flashforge.client"):
+        result = await client.send_product_command()
+
+    assert result is False
+    assert "Could not parse the /product response" in caplog.text
 
 
 @pytest.mark.asyncio

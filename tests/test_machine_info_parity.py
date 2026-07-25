@@ -14,6 +14,7 @@ from tests.fixtures.printer_responses import (
     CREATOR_5_INFO_RESPONSE,
     CREATOR_5_PRO_INFO_RESPONSE,
     CREATOR_5_PRO_MATL_STATION_INFO,
+    CREATOR_5_PRO_MATL_STATION_UNKNOWN_FIELD,
     FIVE_M_PRO_INFO_RESPONSE,
 )
 
@@ -58,8 +59,10 @@ def test_machine_info_sets_completion_time_and_progress_fields():
     assert machine_info.print_eta == "01:00"
     assert machine_info.print_progress == 0.25
     assert machine_info.print_progress_int == 25
-    assert before + timedelta(seconds=3590) <= machine_info.completion_time <= after + timedelta(
-        seconds=3610
+    assert (
+        before + timedelta(seconds=3590)
+        <= machine_info.completion_time
+        <= after + timedelta(seconds=3610)
     )
 
 
@@ -280,6 +283,40 @@ def test_machine_info_derives_material_station_when_the_flag_is_absent():
     # Deriving the station must not drag a Creator 5 into AD5X detection.
     assert machine_info.is_ad5x is False
     assert machine_info.is_creator5_pro is True
+
+
+def test_machine_info_keeps_material_station_when_firmware_adds_a_field():
+    """An unknown field nested in /detail must not fail the whole response.
+
+    Regression test for ff-5mp-hass#18: FFPrinterDetail was extra="allow", but
+    MatlStationInfo and SlotInfo underneath it were extra="forbid", so a new
+    field at either level raised ValidationError for the entire /detail parse.
+    Info.get_detail_response catches that and returns None, which the HA config
+    flow reports as "could not retrieve printer information" during setup - on
+    the endpoint we believed was already protected, and on the exact model
+    (a 4-head Creator 5 Pro with four loaded slots) most likely to grow one.
+    """
+    payload = deepcopy(CREATOR_5_PRO_INFO_RESPONSE)
+    payload["detail"]["matlStationInfo"] = deepcopy(CREATOR_5_PRO_MATL_STATION_UNKNOWN_FIELD)
+
+    machine_info = _parse_detail(payload)
+
+    # The station parses, and the known fields survive alongside the unknown ones.
+    assert machine_info.has_matl_station is True
+    assert machine_info.matl_station_info is not None
+    assert machine_info.matl_station_info.slot_cnt == 4
+    assert [slot.material_name for slot in machine_info.matl_station_info.slot_infos] == [
+        "PLA",
+        "PETG",
+        "PLA",
+        "PLA",
+    ]
+    assert [slot.material_color for slot in machine_info.matl_station_info.slot_infos] == [
+        "#1B1B1B",
+        "#1B1B1B",
+        "#FFFFFF",
+        "#805003",
+    ]
 
 
 def test_machine_info_material_station_is_false_not_none_when_absent():
