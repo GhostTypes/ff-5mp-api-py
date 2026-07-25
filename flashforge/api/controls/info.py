@@ -89,6 +89,12 @@ class MachineInfoParser:
             print_progress = getattr(detail, "print_progress", 0) or 0
             est_length = total_job_filament_meters * print_progress
             est_weight = (getattr(detail, "estimated_right_weight", 0) or 0) * print_progress
+            # Material Station presence, derived rather than read off a single
+            # field. `hasMatlStation` is AD5X-only: the Creator 5 series omits it
+            # from /detail entirely (verified on a Creator 5 Pro, pid 41, firmware
+            # 1.9.4) while reporting a fully populated matlStationInfo with four
+            # loaded slots, so an absent flag means "not reported", never "absent
+            # hardware". Populated slot data is the reliable signal.
             has_material_station = (
                 getattr(detail, "has_matl_station", None) is True
                 or (getattr(getattr(detail, "matl_station_info", None), "slot_cnt", 0) or 0) > 0
@@ -249,8 +255,8 @@ class MachineInfoParser:
                 completion_time=completion_time,
                 formatted_run_time=formatted_run_time,
                 formatted_total_run_time=formatted_total_run_time,
-                # AD5X Material Station
-                has_matl_station=getattr(detail, "has_matl_station", None),
+                # Material Station (AD5X / Creator 5 series)
+                has_matl_station=has_material_station,
                 matl_station_info=getattr(detail, "matl_station_info", None),
                 indep_matl_info=getattr(detail, "indep_matl_info", None),
             )

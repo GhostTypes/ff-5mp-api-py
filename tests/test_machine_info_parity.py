@@ -13,6 +13,7 @@ from tests.fixtures.printer_responses import (
     AD5X_INFO_RESPONSE,
     CREATOR_5_INFO_RESPONSE,
     CREATOR_5_PRO_INFO_RESPONSE,
+    CREATOR_5_PRO_MATL_STATION_INFO,
     FIVE_M_PRO_INFO_RESPONSE,
 )
 
@@ -247,6 +248,57 @@ def test_machine_info_creator5_has_camera_via_stream_url_when_flag_absent():
     machine_info = _parse_detail(payload)
 
     assert machine_info.has_camera is True
+
+
+def test_machine_info_derives_material_station_when_the_flag_is_absent():
+    """A Creator 5 Pro reports a station but never the `hasMatlStation` flag.
+
+    Regression test: `has_matl_station` used to be a straight copy of the raw
+    field, so it stayed None on the Creator 5 series and every consumer gating
+    on it concluded there was no station - while matlStationInfo listed four
+    loaded slots. Verified against real hardware (pid 41, firmware 1.9.4).
+    """
+    payload = deepcopy(CREATOR_5_PRO_INFO_RESPONSE)
+    payload["detail"]["matlStationInfo"] = deepcopy(CREATOR_5_PRO_MATL_STATION_INFO)
+    assert "hasMatlStation" not in payload["detail"]  # exactly what the printer sends
+
+    machine_info = _parse_detail(payload)
+
+    # The raw model still carries the firmware's (absent) value...
+    detail = DetailResponse(**payload).detail
+    assert detail.has_matl_station is None
+    # ...while the parsed capability reflects what the slots prove.
+    assert machine_info.has_matl_station is True
+    assert machine_info.matl_station_info is not None
+    assert machine_info.matl_station_info.slot_cnt == 4
+    assert [slot.material_name for slot in machine_info.matl_station_info.slot_infos] == [
+        "PLA",
+        "PETG",
+        "PLA",
+        "PLA",
+    ]
+    # Deriving the station must not drag a Creator 5 into AD5X detection.
+    assert machine_info.is_ad5x is False
+    assert machine_info.is_creator5_pro is True
+
+
+def test_machine_info_material_station_is_false_not_none_when_absent():
+    """No flag and no station block reports False - the capability has no unknown state.
+
+    A None here is what let consumers read "not reported" as "no hardware"; the
+    parser always resolves the question it was asked.
+    """
+    machine_info = _parse_detail(CREATOR_5_PRO_INFO_RESPONSE)
+
+    assert machine_info.matl_station_info is None
+    assert machine_info.has_matl_station is False
+
+
+def test_machine_info_material_station_false_when_flag_says_so_without_slots():
+    """A model that explicitly reports no station keeps reporting none."""
+    machine_info = _parse_detail(FIVE_M_PRO_INFO_RESPONSE)
+
+    assert machine_info.has_matl_station is False
 
 
 def test_machine_info_creator5_single_nozzle_falls_back_to_extruder():

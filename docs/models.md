@@ -71,13 +71,23 @@ The primary model for printer status, aggregating data from various sources into
 | `flash_cloud_register_code` | `str` | FlashCloud registration code |
 | `polar_cloud_register_code` | `str` | PolarCloud registration code |
 
-#### Material Station (AD5X)
+#### Material Station (AD5X / Creator 5 series)
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `has_matl_station` | `Optional[bool]` | Material station present |
+| `has_matl_station` | `bool` | Material station present (derived — see below) |
 | `matl_station_info` | `Optional[MatlStationInfo]` | Material station details |
 | `indep_matl_info` | `Optional[IndepMatlInfo]` | Independent material info |
+
+`has_matl_station` is **derived**, not copied from the printer's raw
+`hasMatlStation` field. That field is AD5X-only: a Creator 5 Pro omits it from
+`/detail` entirely even with four loaded slots, so an absent value means "not
+reported", never "no station". The parser therefore also accepts a populated
+`matlStationInfo` (`slot_cnt` / `slot_infos`) as proof, and the property is a
+plain `bool` — the capability has no unknown state to represent.
+
+Gate features on this property. `FFPrinterDetail.has_matl_station` keeps the
+untouched firmware value and is `Optional[bool]` for that reason.
 
 ### Temperature
 
