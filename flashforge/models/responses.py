@@ -10,7 +10,12 @@ from .machine_info import FFGcodeFileEntry, FFPrinterDetail
 class GenericResponse(BaseModel):
     """Represents a generic response from the printer's API."""
 
-    model_config = ConfigDict(extra="forbid")
+    # `extra="allow"` on every inbound model: this is the envelope each printer
+    # response inherits, so a firmware update that adds one top-level key must
+    # not fail validation here. Callers cannot tell a parse failure from a real
+    # error - `send_product_command` returns a bare False either way, which the
+    # HA integration reports to the user as "check code incorrect".
+    model_config = ConfigDict(extra="allow")
 
     code: int
     message: str = ""
@@ -18,8 +23,6 @@ class GenericResponse(BaseModel):
 
 class DetailResponse(GenericResponse):
     """Represents the structure of the response from the printer's detail endpoint."""
-
-    model_config = ConfigDict(extra="forbid")
 
     detail: FFPrinterDetail
 
@@ -36,7 +39,10 @@ class Product(BaseModel):
     Field names match the actual camelCase format returned by the printer.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    # `extra="allow"`: an unrecognized control-state flag must not fail
+    # validation. `send_product_command` has no fallback - it returns False,
+    # which is indistinguishable from the printer rejecting the credentials.
+    model_config = ConfigDict(extra="allow")
 
     chamberTempCtrlState: int  # noqa: N815 - field must match API camelCase response format
     externalFanCtrlState: int  # noqa: N815 - field must match API camelCase response format
@@ -54,8 +60,6 @@ class ProductResponse(GenericResponse):
     This response includes general status information (via `GenericResponse`)
     and a nested `product` object containing specific control states.
     """
-
-    model_config = ConfigDict(extra="forbid")
 
     product: Product
 
@@ -96,6 +100,10 @@ class FilamentArgs(BaseModel):
 class AD5XMaterialMapping(BaseModel):
     """Represents a material mapping for AD5X multi-color printing. Maps a tool (extruder) to a specific material station slot."""
 
+    # `extra="forbid"` deliberately, as on every outbound param model below:
+    # these are request bodies this library constructs, so no firmware update
+    # can break them, and forbidding extras turns a caller's typo'd keyword
+    # into an error instead of a field the printer silently ignores.
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     tool_id: int = Field(ge=0, le=3, description="Tool ID (0-based: 0, 1, 2, 3)")
@@ -181,9 +189,7 @@ class Creator5JobParams(BaseModel):
     leveling_before_print: bool = Field(
         description="Whether to perform bed leveling before printing"
     )
-    flow_calibration: bool = Field(
-        default=False, description="Whether to enable flow calibration"
-    )
+    flow_calibration: bool = Field(default=False, description="Whether to enable flow calibration")
     time_lapse_video: bool = Field(
         default=False, description="Whether to enable time lapse video recording"
     )
@@ -209,15 +215,11 @@ class Creator5UploadParams(BaseModel):
     leveling_before_print: bool = Field(
         description="Whether to perform bed leveling before printing"
     )
-    flow_calibration: bool = Field(
-        default=False, description="Whether to enable flow calibration"
-    )
+    flow_calibration: bool = Field(default=False, description="Whether to enable flow calibration")
     time_lapse_video: bool = Field(
         default=False, description="Whether to enable time lapse video recording"
     )
-    use_matl_station: bool = Field(
-        description="Whether this is a multi-tool material-station job"
-    )
+    use_matl_station: bool = Field(description="Whether this is a multi-tool material-station job")
     gcode_tool_cnt: int = Field(
         ge=1, le=4, description="Number of tools in the G-code (1-4 for the C5)"
     )
@@ -237,7 +239,8 @@ class GCodeListResponse(GenericResponse):
 class ThumbnailResponse(GenericResponse):
     """Represents the response structure for a G-code thumbnail request."""
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    # `extra="allow"`: inbound, see GenericResponse.
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     image_data: str = Field(
         alias="imageData", description="The thumbnail image data encoded as a base64 string"

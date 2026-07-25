@@ -29,6 +29,10 @@ class MachineState(Enum):
 class Temperature(BaseModel):
     """Represents a pair of current and target temperatures for a component like an extruder or print bed."""
 
+    # `extra="forbid"` deliberately: this model is never parsed from a printer
+    # payload, only constructed by MachineInfoParser.from_detail. Forbidding
+    # extras there catches a typo'd keyword argument in our own parser, which
+    # `extra="allow"` would silently absorb.
     model_config = ConfigDict(extra="forbid")
 
     current: float = Field(
@@ -42,7 +46,12 @@ class Temperature(BaseModel):
 class SlotInfo(BaseModel):
     """Information about a single slot in the material station."""
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    # `extra="allow"`: inbound, nested under FFPrinterDetail.matl_station_info.
+    # FFPrinterDetail allowing extras is not enough on its own - a new field on
+    # a *child* fails validation for the whole /detail response, and
+    # `Info.get_detail_response` swallows that and returns None, which the HA
+    # integration reports as "could not retrieve printer information".
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     has_filament: bool = Field(
         alias="hasFilament", description="Indicates if filament is present in this slot"
@@ -69,7 +78,8 @@ class SlotInfo(BaseModel):
 class MatlStationInfo(BaseModel):
     """Detailed information about the material station."""
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    # `extra="allow"`: inbound, see SlotInfo.
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     current_load_slot: int = Field(
         alias="currentLoadSlot", ge=0, le=4, description="Currently loading slot ID (0 if none)"
@@ -98,7 +108,8 @@ class MatlStationInfo(BaseModel):
 class IndepMatlInfo(BaseModel):
     """Information related to independent material loading, often used when a single extruder printer has a material station."""
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    # `extra="allow"`: inbound, see SlotInfo.
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     material_color: str = Field(alias="materialColor", description="Color of the material")
     material_name: str = Field(
@@ -123,7 +134,10 @@ class IndepMatlInfo(BaseModel):
 class FFGcodeToolData(BaseModel):
     """Represents data for a single tool/material used in a G-code file, typically part of a multi-material print."""
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    # `extra="allow"`: inbound, nested under FFGcodeFileEntry - which already
+    # allows extras, but a child that forbids them reintroduces the same
+    # names-only fallback it was flipped to avoid.
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     filament_weight: float = Field(
         alias="filamentWeight",
@@ -297,6 +311,10 @@ class FFMachineInfo(BaseModel):
     This interface is populated by transforming data from FFPrinterDetail.
     """
 
+    # `extra="forbid"` deliberately: see Temperature. Built only at
+    # `MachineInfoParser.from_detail`, from ~50 keyword arguments, never from
+    # raw printer JSON - so forbidding extras is a typo check on our own code,
+    # not a firmware-compatibility risk.
     model_config = ConfigDict(extra="forbid")
 
     # Auto-shutdown settings

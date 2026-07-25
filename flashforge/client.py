@@ -6,9 +6,11 @@ communication layers for controlling FlashForge 3D printers.
 """
 
 import asyncio
+import logging
 from dataclasses import dataclass
 
 import aiohttp
+from pydantic import ValidationError
 
 from .api.constants.endpoints import CAMERA_STREAM_PORT, Endpoints
 from .api.controls import Control, Files, Info, JobControl, TempControl
@@ -18,6 +20,8 @@ from .models import FFMachineInfo, Product, ProductResponse
 from .tcp import FlashForgeClient as TcpClient
 from .tcp import FlashForgeTcpClientOptions, PrinterInfo
 from .tcp.parsers.temp_info import TempInfo
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -476,8 +480,21 @@ class FlashForgeClient:
                     self._apply_feature_overrides()
                     return True
 
+        except ValidationError as error:
+            # Distinct from a rejected check code, and it must not read as one:
+            # the printer answered 200 with code 0, we simply could not parse
+            # what it said. Callers treat a False return as bad credentials
+            # (ff-5mp-hass surfaces it as "check code incorrect"), so the log
+            # line is the only place the real cause can surface.
+            logger.warning(
+                "Could not parse the /product response; reporting the printer as "
+                "unavailable rather than the credentials as rejected. This usually "
+                "means the firmware added a field this library has not seen. %s",
+                error,
+            )
+            return False
         except Exception as error:
-            print(f"Error in send_product_command: {error}")
+            logger.warning("Error in send_product_command: %s", error)
             return False
         finally:
             self._http_client_busy = False
