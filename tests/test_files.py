@@ -3,6 +3,7 @@ Unit tests for the Files module.
 """
 
 import json
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -11,6 +12,7 @@ from flashforge.client import FlashForgeClient
 from tests.fixtures.printer_responses import (
     FILE_LIST_5M_PRO_RESPONSE,
     FILE_LIST_AD5X_RESPONSE,
+    FILE_LIST_AD5X_UNKNOWN_FIELD_RESPONSE,
     THUMBNAIL_RESPONSE,
 )
 
@@ -55,6 +57,59 @@ async def test_get_recent_file_list_ad5x_format():
     assert entry.gcode_file_name == "multi_color_test.3mf"
     assert entry.gcode_tool_cnt == 2
     assert entry.use_matl_station is True
+
+
+@pytest.mark.asyncio
+async def test_get_recent_file_list_keeps_metadata_when_firmware_adds_a_field():
+    """An unknown field must not cost the caller every per-file field.
+
+    Regression test: both models were ``extra="forbid"``, so one unrecognized
+    key anywhere in /gcodeList raised ValidationError, and the handler fell back
+    to a names-only list with printingTime=0 and every other field None. That is
+    byte-for-byte what a printer reporting names only looks like, so a firmware
+    change here would have read as "this model reports no metadata" - silently,
+    on every model.
+    """
+    client = _build_client()
+    mock_session = _mock_session(FILE_LIST_AD5X_UNKNOWN_FIELD_RESPONSE)
+
+    with patch("aiohttp.ClientSession", return_value=mock_session):
+        with patch("flashforge.api.controls.files.NetworkUtils.is_ok", return_value=True):
+            result = await client.files.get_recent_file_list()
+
+    assert len(result) == 1
+    entry = result[0]
+    assert entry.gcode_file_name == "multi_color_test.3mf"
+    # The known fields survive alongside the unknown one...
+    assert entry.printing_time == 1800
+    assert entry.gcode_tool_cnt == 2
+    assert entry.use_matl_station is True
+    assert entry.gcode_tool_datas is not None
+    assert entry.gcode_tool_datas[0].slot_id == 1
+    # ...and the metadata is real, not the names-only fallback's placeholders.
+    assert entry.printing_time != 0
+
+
+@pytest.mark.asyncio
+async def test_get_recent_file_list_warns_when_it_falls_back_to_names_only(caplog):
+    """The lossy fallback must be visible in the log, not silent.
+
+    Whether a printer reports no metadata or the library failed to parse it is
+    otherwise indistinguishable from the outside, which is exactly the ambiguity
+    that made this bug survive unnoticed.
+    """
+    client = _build_client()
+    # `code` is required by GenericResponse; omitting it fails validation no
+    # matter how permissive the models are about *extra* fields.
+    mock_session = _mock_session({"gcodeList": ["benchy.gcode"]})
+
+    with caplog.at_level(logging.WARNING, logger="flashforge.api.controls.files"):
+        with patch("aiohttp.ClientSession", return_value=mock_session):
+            with patch("flashforge.api.controls.files.NetworkUtils.is_ok", return_value=True):
+                result = await client.files.get_recent_file_list()
+
+    assert [entry.gcode_file_name for entry in result] == ["benchy.gcode"]
+    assert "falling back to file names only" in caplog.text
 
 
 @pytest.mark.asyncio

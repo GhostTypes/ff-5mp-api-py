@@ -226,7 +226,9 @@ class Creator5UploadParams(BaseModel):
 class GCodeListResponse(GenericResponse):
     """Represents the response structure for a G-code file list request."""
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    # `extra="allow"`: see FFGcodeFileEntry. An unknown field at either level
+    # costs the caller all per-file metadata, so neither level may forbid one.
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     gcode_list: list[str] | list[FFGcodeFileEntry] | None = Field(default=None, alias="gcodeList")
     gcode_list_detail: list[FFGcodeFileEntry] | None = Field(default=None, alias="gcodeListDetail")
