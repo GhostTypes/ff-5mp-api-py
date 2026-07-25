@@ -727,7 +727,7 @@ class Test5MProLiveIntegration:
             info = await client.info.get()
             assert info is not None
             assert info.is_ad5x == False
-            assert info.has_matl_station is None  # Not AD5X, shouldn't have this
+            assert info.has_matl_station is False  # derived capability: no station present
 
     async def test_get_file_list_5m_pro(self):
         """Test getting file list from 5M Pro (non-AD5X format)."""

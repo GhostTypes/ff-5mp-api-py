@@ -141,6 +141,25 @@ CREATOR_5_PRO_INFO_RESPONSE = {
     },
 }
 
+# A Material Station block as the Creator 5 Pro reports it (pid 41, firmware
+# 1.9.4). Note what is deliberately NOT here: `hasMatlStation`. That field is
+# AD5X-only and the Creator 5 series omits it from /detail entirely, even with
+# four loaded slots - so anything gating on the raw flag misses the station on
+# exactly the models that have one. Merge into a /detail payload to cover that.
+CREATOR_5_PRO_MATL_STATION_INFO = {
+    "currentLoadSlot": 0,
+    "currentSlot": 0,
+    "slotCnt": 4,
+    "slotInfos": [
+        {"slotId": 1, "hasFilament": True, "materialName": "PLA", "materialColor": "#1B1B1B"},
+        {"slotId": 2, "hasFilament": True, "materialName": "PETG", "materialColor": "#1B1B1B"},
+        {"slotId": 3, "hasFilament": True, "materialName": "PLA", "materialColor": "#FFFFFF"},
+        {"slotId": 4, "hasFilament": True, "materialName": "PLA", "materialColor": "#805003"},
+    ],
+    "stateAction": 0,
+    "stateStep": 0,
+}
+
 FILE_LIST_AD5X_RESPONSE = {
     "code": 0,
     "gcodeListDetail": [

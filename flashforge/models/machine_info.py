@@ -235,6 +235,10 @@ class FFPrinterDetail(BaseModel):
     fill_amount: float | None = Field(default=None, ge=0, le=100, alias="fillAmount")
     firmware_version: str | None = Field(default=None, alias="firmwareVersion")
     flash_register_code: str | None = Field(default=None, alias="flashRegisterCode")
+    # AD5X-only, and firmware omits what does not apply: the Creator 5 series
+    # leaves this out of /detail even with four loaded slots, so None means "not
+    # reported", NOT "no station". Never gate a feature on it - read the derived
+    # FFMachineInfo.has_matl_station, or check matl_station_info yourself.
     has_matl_station: bool | None = Field(default=None, alias="hasMatlStation")
     matl_station_info: MatlStationInfo | None = Field(default=None, alias="matlStationInfo")
     indep_matl_info: IndepMatlInfo | None = Field(default=None, alias="indepMatlInfo")
@@ -399,8 +403,15 @@ class FFMachineInfo(BaseModel):
     formatted_run_time: str = "00:00"
     formatted_total_run_time: str = "0h:0m"
 
-    # AD5X Material Station
-    has_matl_station: bool | None = None
+    # Material Station (AD5X / Creator 5 series)
+    #
+    # A capability, not a passthrough: MachineInfoParser DERIVES this from the
+    # station data rather than copying the raw `hasMatlStation` field, which the
+    # Creator 5 series never reports even with a station attached. It is a plain
+    # bool on purpose - there is no "unknown" state to represent, and offering
+    # one is what let an unreported flag read as absent hardware. For the
+    # untouched firmware value, read FFPrinterDetail.has_matl_station.
+    has_matl_station: bool = False
     matl_station_info: MatlStationInfo | None = None
     indep_matl_info: IndepMatlInfo | None = None
 
