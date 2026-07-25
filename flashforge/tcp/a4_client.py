@@ -274,7 +274,11 @@ class FlashForgeA4Client(FlashForgeTcpClient):
         return normalized
 
     def _get_normalized_lines(self, response: str) -> list[str]:
-        return [line.strip() for line in self._normalize_a4_text_response(response).split("\n") if line.strip()]
+        return [
+            line.strip()
+            for line in self._normalize_a4_text_response(response).split("\n")
+            if line.strip()
+        ]
 
     def _detect_variant(self, machine_type: str) -> A4PrinterVariant:
         normalized_type = machine_type.upper()

@@ -141,9 +141,7 @@ class Files:
                     elif isinstance(first_item, FFGcodeFileEntry):
                         # Already FFGcodeFileEntry objects - need explicit type narrowing
                         return [
-                            item
-                            for item in result.gcode_list
-                            if isinstance(item, FFGcodeFileEntry)
+                            item for item in result.gcode_list if isinstance(item, FFGcodeFileEntry)
                         ]
 
                 return []

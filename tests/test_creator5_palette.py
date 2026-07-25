@@ -57,9 +57,7 @@ def test_snaps_pure_red_to_palette_red():
     assert snap_to_creator5_palette("#FF0000").hex == "#F82D29"
 
 
-@pytest.mark.parametrize(
-    "hex_input", ["#4CAAF8", "#4caaf8", "4caaF8"]
-)
+@pytest.mark.parametrize("hex_input", ["#4CAAF8", "#4caaf8", "4caaF8"])
 def test_exact_palette_entry_snaps_to_itself_regardless_of_case(hex_input):
     """An exact palette entry snaps to itself regardless of input case/shape."""
     assert snap_to_creator5_palette(hex_input).hex == "#4CAAF8"

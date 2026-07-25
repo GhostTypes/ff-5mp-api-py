@@ -118,7 +118,9 @@ class EndstopStatus:
             return None
 
         try:
-            lines = [line.strip() for line in replay.replace("\r", "\n").split("\n") if line.strip()]
+            lines = [
+                line.strip() for line in replay.replace("\r", "\n").split("\n") if line.strip()
+            ]
             if not lines:
                 return None
 

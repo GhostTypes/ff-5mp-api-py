@@ -86,9 +86,9 @@ class TestAD5XLiveConnection:
                     assert slot.material_color is not None
                     # Color should be hex format if not empty
                     if slot.material_color and slot.material_color != "":
-                        assert slot.material_color.startswith("#"), (
-                            f"Color should be hex format: {slot.material_color}"
-                        )
+                        assert slot.material_color.startswith(
+                            "#"
+                        ), f"Color should be hex format: {slot.material_color}"
 
 
 @pytest.mark.asyncio

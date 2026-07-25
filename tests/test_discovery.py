@@ -109,7 +109,9 @@ def test_calculate_broadcast_address():
     """Broadcast address calculation supports common subnets."""
     discovery = FlashForgePrinterDiscovery()
 
-    assert discovery._calculate_broadcast_address("192.168.1.10", "255.255.255.0") == "192.168.1.255"
+    assert (
+        discovery._calculate_broadcast_address("192.168.1.10", "255.255.255.0") == "192.168.1.255"
+    )
     assert discovery._calculate_broadcast_address("10.0.0.50", "255.255.0.0") == "10.0.255.255"
     assert discovery._calculate_broadcast_address("invalid", "255.255.255.0") is None
 
@@ -209,8 +211,14 @@ def test_detect_modern_model_prefers_product_id():
     discovery = PrinterDiscovery()
 
     # PID wins even when the name has been changed by the user.
-    assert discovery.detect_modern_model("My Renamed Printer", 0x5A02, 0x0024) == PrinterModel.ADVENTURER_5M_PRO
-    assert discovery.detect_modern_model("My Renamed Printer", 0x5A02, 0x0023) == PrinterModel.ADVENTURER_5M
+    assert (
+        discovery.detect_modern_model("My Renamed Printer", 0x5A02, 0x0024)
+        == PrinterModel.ADVENTURER_5M_PRO
+    )
+    assert (
+        discovery.detect_modern_model("My Renamed Printer", 0x5A02, 0x0023)
+        == PrinterModel.ADVENTURER_5M
+    )
     assert discovery.detect_modern_model("whatever", 0x0000, 0x0026) == PrinterModel.AD5X
 
 
@@ -219,7 +227,9 @@ def test_detect_modern_model_detects_creator_5():
     discovery = PrinterDiscovery()
 
     assert discovery.detect_modern_model("Creator 5", 0x0000, 0x0028) == PrinterModel.CREATOR_5
-    assert discovery.detect_modern_model("Creator 5 Pro", 0x0000, 0x0029) == PrinterModel.CREATOR_5_PRO
+    assert (
+        discovery.detect_modern_model("Creator 5 Pro", 0x0000, 0x0029) == PrinterModel.CREATOR_5_PRO
+    )
 
 
 def test_map_status_code():
@@ -263,11 +273,15 @@ async def test_discover_prefers_modern_duplicates():
     )
 
     with (
-        patch.object(discovery, "_create_endpoint", AsyncMock(return_value=(fake_transport, Mock()))),
+        patch.object(
+            discovery, "_create_endpoint", AsyncMock(return_value=(fake_transport, Mock()))
+        ),
         patch.object(discovery, "_send_discovery_packets"),
         patch.object(discovery, "_receive_responses", AsyncMock(return_value=[legacy, modern])),
     ):
-        printers = await discovery.discover(DiscoveryOptions(timeout=50, idle_timeout=10, max_retries=1))
+        printers = await discovery.discover(
+            DiscoveryOptions(timeout=50, idle_timeout=10, max_retries=1)
+        )
 
     assert printers == [modern]
 
@@ -328,7 +342,9 @@ async def test_legacy_wrapper_discover_printers_async_returns_wrapper_objects():
         "discover",
         AsyncMock(return_value=[discovered_printer]),
     ):
-        printers = await discovery.discover_printers_async(timeout_ms=50, idle_timeout_ms=10, max_retries=1)
+        printers = await discovery.discover_printers_async(
+            timeout_ms=50, idle_timeout_ms=10, max_retries=1
+        )
 
     assert printers == [
         FlashForgePrinter(

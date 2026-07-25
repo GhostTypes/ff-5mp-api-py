@@ -84,7 +84,11 @@ class FlashForgeA3Client(FlashForgeTcpClient):
         bare_cmd = self._strip_protocol_prefix(cmd)
         if bare_cmd.startswith("M661"):
             return 500
-        if bare_cmd.startswith("M115") or bare_cmd.startswith("M119") or bare_cmd.startswith("M650"):
+        if (
+            bare_cmd.startswith("M115")
+            or bare_cmd.startswith("M119")
+            or bare_cmd.startswith("M650")
+        ):
             return 250
         return 200
 
@@ -102,7 +106,7 @@ class FlashForgeA3Client(FlashForgeTcpClient):
         if "Error: File not exists" in text_prefix:
             return True
 
-        magic_offset = buffer.find(b"\xA2\xA2\x2A\x2A")
+        magic_offset = buffer.find(b"\xa2\xa2\x2a\x2a")
         if magic_offset == -1 or len(buffer) < magic_offset + 8:
             return False
 
@@ -163,7 +167,9 @@ class FlashForgeA3Client(FlashForgeTcpClient):
             elif line.startswith("Mac Address:"):
                 info.mac_address = line.replace("Mac Address:", "", 1).strip()
             else:
-                volume_match = re.search(r"X:\s*(\d+)\s+Y:\s*(\d+)\s+Z:\s*(\d+)", line, re.IGNORECASE)
+                volume_match = re.search(
+                    r"X:\s*(\d+)\s+Y:\s*(\d+)\s+Z:\s*(\d+)", line, re.IGNORECASE
+                )
                 if volume_match:
                     info.build_volume = A3BuildVolume(
                         x=int(volume_match.group(1)),
@@ -331,7 +337,11 @@ class FlashForgeA3Client(FlashForgeTcpClient):
 
         files: list[A3FileEntry] = []
         count_index = next(
-            (index for index, line in enumerate(lines) if re.search(r"info_list\.size:\s*\d+", line)),
+            (
+                index
+                for index, line in enumerate(lines)
+                if re.search(r"info_list\.size:\s*\d+", line)
+            ),
             -1,
         )
         if count_index == -1:
@@ -354,11 +364,13 @@ class FlashForgeA3Client(FlashForgeTcpClient):
         if "Error: File not exists" in error_text:
             return None
 
-        magic_offset = buffer.find(b"\xA2\xA2\x2A\x2A")
+        magic_offset = buffer.find(b"\xa2\xa2\x2a\x2a")
         if magic_offset == -1 or len(buffer) < magic_offset + 8:
             return None
 
-        payload_length = int.from_bytes(buffer[magic_offset + 4 : magic_offset + 8], byteorder="big")
+        payload_length = int.from_bytes(
+            buffer[magic_offset + 4 : magic_offset + 8], byteorder="big"
+        )
         payload_end = magic_offset + 8 + payload_length
         if len(buffer) < payload_end:
             return None
@@ -378,7 +390,11 @@ class FlashForgeA3Client(FlashForgeTcpClient):
         return normalized.rstrip()
 
     def _get_normalized_lines(self, response: str) -> list[str]:
-        return [line.strip() for line in self._normalize_a3_text_response(response).split("\n") if line.strip()]
+        return [
+            line.strip()
+            for line in self._normalize_a3_text_response(response).split("\n")
+            if line.strip()
+        ]
 
     def _map_controller_command(self, cmd: str) -> str:
         if cmd == "~M146 r255 g255 b255 F0":
@@ -399,7 +415,10 @@ class FlashForgeA3Client(FlashForgeTcpClient):
         if bare_cmd.startswith("M23"):
             return "File opened" in normalized or "ok" in normalized
         if bare_cmd.startswith("M112"):
-            return bool(re.search(r"Emergency Stop", normalized, re.IGNORECASE)) or "Received." in normalized
+            return (
+                bool(re.search(r"Emergency Stop", normalized, re.IGNORECASE))
+                or "Received." in normalized
+            )
         if "ok" in normalized or "Received." in normalized:
             return True
         return normalized.startswith(bare_cmd)

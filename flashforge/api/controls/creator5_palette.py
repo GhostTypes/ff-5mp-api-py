@@ -70,7 +70,7 @@ CREATOR5_PALETTE: tuple[Creator5PaletteColor, ...] = (
 )
 
 # 25^7, the CIEDE2000 chroma weighting constant.
-_25_POW_7 = 25.0 ** 7
+_25_POW_7 = 25.0**7
 
 # D65 reference white point used by the sRGB -> XYZ transform.
 _D65_XN = 0.95047
@@ -132,7 +132,7 @@ def _delta_e_2000(c1: tuple[float, float, float], c2: tuple[float, float, float]
     C1 = math.sqrt(a1 * a1 + b1 * b1)
     C2 = math.sqrt(a2 * a2 + b2 * b2)
     Cbar = (C1 + C2) / 2.0
-    Cbar7 = Cbar ** 7
+    Cbar7 = Cbar**7
     G = 0.5 * (1 - math.sqrt(Cbar7 / (Cbar7 + _25_POW_7)))
 
     a1p = (1 + G) * a1
@@ -178,7 +178,7 @@ def _delta_e_2000(c1: tuple[float, float, float], c2: tuple[float, float, float]
     )
 
     dTheta = 30 * math.exp(-(((hbarp - 275) / 25.0) ** 2))
-    Cbarp7 = Cbarp ** 7
+    Cbarp7 = Cbarp**7
     RC = 2 * math.sqrt(Cbarp7 / (Cbarp7 + _25_POW_7))
     SL = 1 + (0.015 * (Lbarp - 50) ** 2) / math.sqrt(20 + (Lbarp - 50) ** 2)
     SC = 1 + 0.045 * Cbarp

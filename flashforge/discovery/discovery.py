@@ -303,7 +303,9 @@ class PrinterDiscovery:
             try:
                 transport, _ = await self._create_endpoint(message_queue, error_queue)
                 self._send_discovery_packets(transport, config)
-                discovered_printers = await self._receive_responses(message_queue, error_queue, config)
+                discovered_printers = await self._receive_responses(
+                    message_queue, error_queue, config
+                )
 
                 for printer in discovered_printers:
                     key = f"{printer.ip_address}:{printer.command_port}"
@@ -454,7 +456,9 @@ class PrinterDiscovery:
         status_code = int.from_bytes(buffer[0x8A:0x8C], byteorder="big")
         product_type = int.from_bytes(buffer[0x8C:0x8E], byteorder="big")
         event_port = int.from_bytes(buffer[0x8E:0x90], byteorder="big")
-        serial_number = buffer[0x92 : 0x92 + 128].decode("utf-8", errors="ignore").split("\x00", 1)[0]
+        serial_number = (
+            buffer[0x92 : 0x92 + 128].decode("utf-8", errors="ignore").split("\x00", 1)[0]
+        )
         model = self.detect_modern_model(name, product_type, product_id)
 
         return DiscoveredPrinter(
@@ -586,9 +590,7 @@ class PrinterDiscovery:
                         continue
 
                     mask_int = (0xFFFFFFFF << (32 - prefix)) & 0xFFFFFFFF
-                    netmask = ".".join(
-                        str((mask_int >> (8 * (3 - i))) & 0xFF) for i in range(4)
-                    )
+                    netmask = ".".join(str((mask_int >> (8 * (3 - i))) & 0xFF) for i in range(4))
 
                     broadcast = self.calculate_broadcast_address(ip_addr, netmask)
                     if broadcast and broadcast not in broadcast_addresses:
@@ -695,7 +697,9 @@ class FlashForgePrinterDiscovery:
             return None
 
         if LEGACY_PROTOCOL_SIZE <= len(response) < MODERN_PROTOCOL_SIZE and len(response) >= 0x92:
-            legacy_name = response[0:32].decode("utf-8", errors="ignore").split("\x00", 1)[0].strip()
+            legacy_name = (
+                response[0:32].decode("utf-8", errors="ignore").split("\x00", 1)[0].strip()
+            )
             legacy_serial = (
                 response[0x92 : 0x92 + 32]
                 .decode("utf-8", errors="ignore")

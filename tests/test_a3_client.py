@@ -45,16 +45,16 @@ async def test_a3_get_printer_info_parses_documented_m115():
         "send_command_async",
         AsyncMock(
             return_value="\n".join(
-            [
-                "echo: Machine Type: FlashForge Adventurer III",
-                "Machine Name: MyPrinter",
-                "Firmware: v1.3.7",
-                "Serial Number: SNADVA3M12345",
-                "X: 150 Y: 150 Z: 150",
-                "Tool Count: 1",
-                "Mac Address:00:11:22:33:44:55",
-                "",
-            ]
+                [
+                    "echo: Machine Type: FlashForge Adventurer III",
+                    "Machine Name: MyPrinter",
+                    "Firmware: v1.3.7",
+                    "Serial Number: SNADVA3M12345",
+                    "X: 150 Y: 150 Z: 150",
+                    "Tool Count: 1",
+                    "Mac Address:00:11:22:33:44:55",
+                    "",
+                ]
             )
         ),
     ):
@@ -111,13 +111,13 @@ async def test_a3_list_files_parses_documented_m661():
         "send_command_async",
         AsyncMock(
             return_value="\n".join(
-            [
-                "CMD M661 Received.",
-                "info_list.size: 3",
-                "test1.gcode",
-                "test2.gx",
-                "test3.g",
-            ]
+                [
+                    "CMD M661 Received.",
+                    "info_list.size: 3",
+                    "test1.gcode",
+                    "test2.gx",
+                    "test3.g",
+                ]
             )
         ),
     ):
@@ -133,7 +133,7 @@ async def test_a3_get_thumbnail_parses_binary_magic_header():
     """A3 thumbnail parsing should honor the Adventurer 3 header format."""
     client = FlashForgeA3Client("192.168.1.100")
     payload = bytearray(100)
-    payload[0:4] = b"\xA2\xA2\x2A\x2A"
+    payload[0:4] = b"\xa2\xa2\x2a\x2a"
     payload[4:8] = (92).to_bytes(4, byteorder="big")
     response = b"CMD M662 Received.\nack header length: 64\n" + bytes(payload)
 
@@ -191,14 +191,14 @@ async def test_a3_get_endstop_status_parses_documented_m119():
         "send_command_async",
         AsyncMock(
             return_value="\n".join(
-            [
-                "echo: Endstop: X-max: 0 Y-max: 0 Z-min: 1",
-                "MachineStatus: IDLE",
-                "MoveMode: 0.0",
-                "FilamentStatus: ok",
-                "LEDStatus: on",
-                "PrintFileName: test.gcode",
-            ]
+                [
+                    "echo: Endstop: X-max: 0 Y-max: 0 Z-min: 1",
+                    "MachineStatus: IDLE",
+                    "MoveMode: 0.0",
+                    "FilamentStatus: ok",
+                    "LEDStatus: on",
+                    "PrintFileName: test.gcode",
+                ]
             )
         ),
     ):
@@ -259,16 +259,16 @@ async def test_a3_controller_get_printer_model_uses_m115():
         "send_command_async",
         AsyncMock(
             return_value="\n".join(
-            [
-                "echo: Machine Type: FlashForge Adventurer III",
-                "Machine Name: MyPrinter",
-                "Firmware: v1.3.7",
-                "Serial Number: SNADVA3M12345",
-                "X: 150 Y: 150 Z: 150",
-                "Tool Count: 1",
-                "Mac Address:00:11:22:33:44:55",
-                "",
-            ]
+                [
+                    "echo: Machine Type: FlashForge Adventurer III",
+                    "Machine Name: MyPrinter",
+                    "Firmware: v1.3.7",
+                    "Serial Number: SNADVA3M12345",
+                    "X: 150 Y: 150 Z: 150",
+                    "Tool Count: 1",
+                    "Mac Address:00:11:22:33:44:55",
+                    "",
+                ]
             )
         ),
     ) as send_command:

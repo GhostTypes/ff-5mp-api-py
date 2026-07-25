@@ -47,7 +47,9 @@ class LocationInfo:
             The populated LocationInfo instance, or None if parsing fails
         """
         try:
-            lines = [line.strip() for line in replay.replace("\r", "\n").split("\n") if line.strip()]
+            lines = [
+                line.strip() for line in replay.replace("\r", "\n").split("\n") if line.strip()
+            ]
             coordinate_line = next(
                 (line for line in lines if "X:" in line and "Y:" in line and "Z:" in line),
                 "",

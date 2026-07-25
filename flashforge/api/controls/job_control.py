@@ -698,9 +698,7 @@ class JobControl:
         if not material_mappings or len(material_mappings) == 0:
             if allow_empty:
                 return True
-            print(
-                f"{label} error: materialMappings array cannot be empty for multi-color jobs"
-            )
+            print(f"{label} error: materialMappings array cannot be empty for multi-color jobs")
             return False
 
         if len(material_mappings) > 4:
@@ -784,7 +782,9 @@ class JobControl:
             return base64.b64encode(json_string.encode("utf-8")).decode("utf-8")
         except Exception as error:
             print("Failed to encode material mappings to base64:", error)
-            raise Exception("Failed to encode material mappings for upload") from error  # noqa: B904
+            raise Exception(
+                "Failed to encode material mappings for upload"
+            ) from error  # noqa: B904
 
     def _validate_material_mappings(self, material_mappings: list[AD5XMaterialMapping]) -> bool:
         """
