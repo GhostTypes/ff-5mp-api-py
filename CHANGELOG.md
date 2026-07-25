@@ -49,6 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`/gcodeList` no longer loses every file's metadata when the firmware adds a field.** `GCodeListResponse` and `FFGcodeFileEntry` were `extra="forbid"`, and `Files.get_recent_file_list()` caught the resulting `ValidationError` and fell back to a names-only list — `printing_time=0` and every other field `None`, for every file. One unrecognized key anywhere in the payload was therefore enough to silently strip print time, filament weight, and the per-tool material data on all models, and the result is byte-for-byte what a printer that genuinely reports names only looks like. Both models now use `extra="allow"` (matching `FFPrinterDetail`), and the remaining fallback logs a warning naming what was lost instead of degrading in silence.
 
+### Fixed
+
+- **`FFMachineInfo.has_matl_station` no longer reports `None` on a Creator 5 with a Material Station attached.** The field was a straight copy of the raw `hasMatlStation` value from `/detail`, which is an AD5X-only field: a Creator 5 Pro omits it entirely — verified on real hardware (pid 41, firmware 1.9.4) — while reporting a fully populated `matlStationInfo` with four loaded slots. Consumers gating features on the flag therefore saw no station on exactly the models that have one. The parser already computed the correct value for its internal AD5X heuristic (flag `is True` OR `slotCnt > 0` OR non-empty `slotInfos`) and then discarded it; that derived value is now what `FFMachineInfo` exposes, and it is always a concrete `True`/`False`. `FFPrinterDetail.has_matl_station` still carries the untouched firmware value.
+
 ## [1.3.1] - 2026-06-28
 
 ### Fixed
