@@ -164,7 +164,7 @@ class FlashForgeClient:
             True if TCP operations are permitted, False otherwise
         """
         if self._http_only:
-            print(f"{op}() unavailable: printer has no TCP control channel (HTTP-only).")
+            logger.debug("%s() unavailable: printer has no TCP control channel (HTTP-only).", op)
             return False
         return True
 
@@ -212,7 +212,7 @@ class FlashForgeClient:
         connected = await self.verify_connection()
         if connected:
             return True
-        print("Failed to connect to printer")
+        logger.warning("Failed to connect to the printer.")
         return False
 
     @property
@@ -260,7 +260,7 @@ class FlashForgeClient:
         """
         if await self.send_product_command():
             return await self.tcp_client.init_control()
-        print("New API control failed!")
+        logger.warning("New API control failed; the product command was rejected.")
         return False
 
     async def dispose(self) -> None:
@@ -396,13 +396,13 @@ class FlashForgeClient:
             # Get HTTP API response
             response = await self.info.get_detail_response()
             if not response or not NetworkUtils.is_ok(response):
-                print("Failed to get valid response from printer API")
+                logger.warning("Failed to get a valid response from the printer API.")
                 return False
 
             # Parse machine info from detail response
             machine_info = MachineInfoParser.from_detail(response.detail)
             if not machine_info:
-                print("Failed to parse machine info from detail response")
+                logger.warning("Failed to parse machine info from the /detail response.")
                 return False
 
             # Detect http_only from the parsed model BEFORE touching TCP. The
@@ -426,16 +426,16 @@ class FlashForgeClient:
                     ):
                         self.is_pro = True
                 else:
-                    print(
-                        "Warning: Unable to get PrinterInfo from TCP API, "
-                        "some features might not work"
+                    logger.warning(
+                        "Unable to get PrinterInfo from the TCP API; some features might "
+                        "not work."
                     )
 
             # Cache the details
             return self.cache_details(machine_info)
 
         except Exception as error:
-            print(f"Error in verify_connection: {error}")
+            logger.warning("Error in verify_connection: %s", error)
             return False
 
     async def send_product_command(self) -> bool:

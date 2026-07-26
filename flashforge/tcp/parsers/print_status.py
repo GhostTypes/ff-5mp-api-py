@@ -4,7 +4,10 @@ FlashForge Python API - Print Status Parser
 Parses print progress information from M27 command responses.
 """
 
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 class PrintStatus:
@@ -69,13 +72,13 @@ class PrintStatus:
                         return None
 
             if not self.sd_current or not self.sd_total:
-                print("PrintStatus: Invalid SD progress format")
+                logger.warning("PrintStatus: invalid SD progress format.")
                 return None
 
             return self
 
         except Exception as e:
-            print(f"Error parsing print status: {e}")
+            logger.warning("Error parsing the print status: %s", e)
             return None
 
     def get_print_percent(self) -> float:

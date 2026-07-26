@@ -90,7 +90,10 @@ class Files:
                 data = await json_from_response(response)
 
                 if not NetworkUtils.is_ok(data):
-                    print(f"Error retrieving file list: {NetworkUtils.get_error_message(data)}")
+                    logger.warning(
+                        "Error retrieving the file list: %s",
+                        NetworkUtils.get_error_message(data),
+                    )
                     return []
 
                 # Parse the response using GCodeListResponse
@@ -147,7 +150,7 @@ class Files:
                 return []
 
         except Exception as err:
-            print(f"GetRecentFileList error: {err}")
+            logger.warning("get_recent_file_list error: %s", err)
             return []
 
     async def get_gcode_thumbnail(self, file_name: str) -> bytes | None:
@@ -185,9 +188,12 @@ class Files:
                     result = ThumbnailResponse(**data)
                     return base64.b64decode(result.image_data)
                 else:
-                    print(f"Error retrieving thumbnail: {NetworkUtils.get_error_message(data)}")
+                    logger.warning(
+                        "Error retrieving the thumbnail: %s",
+                        NetworkUtils.get_error_message(data),
+                    )
                     return None
 
         except Exception as err:
-            print(f"GetGcodeThumbnail error: {err}")
+            logger.warning("get_gcode_thumbnail error: %s", err)
             return None

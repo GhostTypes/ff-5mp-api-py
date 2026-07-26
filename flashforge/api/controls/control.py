@@ -2,6 +2,7 @@
 FlashForge Python API - Control Module
 """
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from ...models.responses import FilamentArgs
@@ -13,6 +14,8 @@ from .creator5_palette import snap_to_creator5_palette
 if TYPE_CHECKING:
     from ...client import FlashForgeClient
     from ...tcp.ff_client import FlashForgeClient as TcpClient
+
+logger = logging.getLogger(__name__)
 
 
 class Control:
@@ -75,7 +78,7 @@ class Control:
             return await self._send_filtration_command(
                 FilamentArgs(internal="close", external="open")
             )
-        print("SetExternalFiltrationOn() error, filtration not equipped.")
+        logger.warning("set_external_filtration_on: filtration is not equipped on this printer.")
         return False
 
     async def set_internal_filtration_on(self) -> bool:
@@ -90,7 +93,7 @@ class Control:
             return await self._send_filtration_command(
                 FilamentArgs(internal="open", external="close")
             )
-        print("SetInternalFiltrationOn() error, filtration not equipped.")
+        logger.warning("set_internal_filtration_on: filtration is not equipped on this printer.")
         return False
 
     async def set_filtration_off(self) -> bool:
@@ -105,7 +108,7 @@ class Control:
             return await self._send_filtration_command(
                 FilamentArgs(internal="close", external="close")
             )
-        print("SetFiltrationOff() error, filtration not equipped.")
+        logger.warning("set_filtration_off: filtration is not equipped on this printer.")
         return False
 
     async def turn_camera_on(self) -> bool:
@@ -188,7 +191,7 @@ class Control:
             True if the command is successful, False otherwise.
         """
         if not self.client.led_control:
-            print("SetLedOn() error, LED control not equipped.")
+            logger.warning("set_led_on: LED control is not equipped on this printer.")
             return False
         return await self.send_control_command(Commands.LIGHT_CONTROL_CMD, {"status": "open"})
 
@@ -200,7 +203,7 @@ class Control:
             True if the command is successful, False otherwise.
         """
         if not self.client.led_control:
-            print("SetLedOff() error, LED control not equipped.")
+            logger.warning("set_led_off: LED control is not equipped on this printer.")
             return False
         return await self.send_control_command(Commands.LIGHT_CONTROL_CMD, {"status": "close"})
 
@@ -259,7 +262,9 @@ class Control:
             True if the command is successful, False otherwise.
         """
         if not self.client.is_ad5x and not self.client.is_creator5:
-            print("configure_slot() error, material station only available on AD5X / Creator 5.")
+            logger.warning(
+                "configure_slot: the material station is only available on the AD5X / Creator 5."
+            )
             return False
         # The AD5X and Creator 5 use MUTUALLY EXCLUSIVE color wire formats (see
         # creator5_palette for the firmware match rules), so model-gate here:
@@ -293,7 +298,9 @@ class Control:
             "payload": {"cmd": command, "args": args},
         }
 
-        print(f"SendControlCommand:\n{payload}")
+        # Log the command, never `payload`: it carries the serial number and
+        # check code, and these lines end up pasted into bug reports.
+        logger.debug("Sending control command %s with args %s", command, args)
 
         try:
             await self.client.is_http_client_busy()
@@ -305,12 +312,12 @@ class Control:
                 headers={"Content-Type": "application/json"},
             ) as response:
                 data = await json_from_response(response)
-                print(f"Command reply: {data}")
+                logger.debug("Control command %s reply: %s", command, data)
 
                 return NetworkUtils.is_ok(data)
 
         except Exception as e:
-            print(f"Error in send_control_command: {e}")
+            logger.warning("Error in send_control_command (%s): %s", command, e)
             return False
         finally:
             self.client.release_http_client()

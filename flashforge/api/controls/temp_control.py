@@ -6,6 +6,7 @@ direct TCP G-code/M-code commands; HTTP-only printers (Creator 5 / 5 Pro, no TCP
 channel) use the HTTP ``temperatureCtl_cmd`` instead.
 """
 
+import logging
 from typing import TYPE_CHECKING
 
 from ..constants.commands import Commands
@@ -13,6 +14,8 @@ from ..constants.commands import Commands
 if TYPE_CHECKING:
     from ...client import FlashForgeClient
     from ...tcp.ff_client import FlashForgeClient as TcpClient
+
+logger = logging.getLogger(__name__)
 
 
 # Sentinel value for `temperatureCtl_cmd` meaning "leave this heater unchanged"
@@ -106,7 +109,9 @@ class TempControl:
             The array, or None if ``tool_index`` is out of range.
         """
         if not isinstance(tool_index, int) or tool_index < 0 or tool_index >= NOZZLE_COUNT:
-            print(f"TempControl: toolIndex {tool_index} out of range (0-{NOZZLE_COUNT - 1}).")
+            logger.warning(
+                "TempControl: tool_index %s out of range (0-%s).", tool_index, NOZZLE_COUNT - 1
+            )
             return None
         nozzles = [TEMP_NO_CHANGE] * NOZZLE_COUNT
         nozzles[tool_index] = value
@@ -145,7 +150,7 @@ class TempControl:
             True if the command is acknowledged, False otherwise.
         """
         if len(temps) != NOZZLE_COUNT:
-            print(f"set_tool_temps: expected {NOZZLE_COUNT} temps, got {len(temps)}.")
+            logger.warning("set_tool_temps: expected %s temps, got %s.", NOZZLE_COUNT, len(temps))
             return False
         return await self._send_http_temp_command(nozzles=list(temps))
 
@@ -258,7 +263,9 @@ class TempControl:
             True if the command is acknowledged, False otherwise.
         """
         if not self.client.is_creator5 and not self.client.is_creator5_pro:
-            print("set_chamber_temp() error, chamber heater only available on Creator 5 series.")
+            logger.warning(
+                "set_chamber_temp: the chamber heater is only available on the Creator 5 series."
+            )
             return False
         return await self._send_http_temp_command(chamber=temp)
 
@@ -270,7 +277,9 @@ class TempControl:
             True if the command is acknowledged, False otherwise.
         """
         if not self.client.is_creator5 and not self.client.is_creator5_pro:
-            print("cancel_chamber_temp() error, chamber heater only available on Creator 5 series.")
+            logger.warning(
+                "cancel_chamber_temp: the chamber heater is only available on the Creator 5 series."
+            )
             return False
         return await self._send_http_temp_command(chamber=TEMP_OFF)
 
@@ -292,8 +301,8 @@ class TempControl:
             or HTTP-only (no TCP polling channel).
         """
         if self.client.http_only:
-            print(
-                "wait_for_part_cool() unavailable over HTTP-only connection; "
+            logger.warning(
+                "wait_for_part_cool is unavailable over an HTTP-only connection; "
                 "poll info.get() instead."
             )
             return False

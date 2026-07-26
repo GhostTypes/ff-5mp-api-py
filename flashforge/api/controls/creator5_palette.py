@@ -16,6 +16,7 @@ for the model-gating that splits them.
 
 from __future__ import annotations
 
+import logging
 import math
 import re
 from dataclasses import dataclass
@@ -24,6 +25,8 @@ from dataclasses import dataclass
 # notation (L, a, b, C', h', etc.) verbatim so it can be checked against the
 # reference. PEP 8 lowercase locals are therefore relaxed here on purpose.
 # ruff: noqa: N806
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -238,9 +241,9 @@ def snap_to_creator5_palette(hex_str: str) -> Creator5PaletteColor:
     """
     rgb = _hex_to_rgb(hex_str)
     if rgb is None:
-        print(
-            f'snap_to_creator5_palette: could not parse "{hex_str}" as hex; '
-            "falling back to White."
+        logger.warning(
+            'snap_to_creator5_palette: could not parse "%s" as hex; falling back to White.',
+            hex_str,
         )
         return CREATOR5_PALETTE[0]
 

@@ -2,6 +2,7 @@
 FlashForge Python API - Info Module
 """
 
+import logging
 import re
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
@@ -9,10 +10,13 @@ from typing import TYPE_CHECKING
 from ...models.machine_info import FFMachineInfo, MachineState, Temperature
 from ...models.responses import DetailResponse, FFPrinterDetail
 from ..constants.endpoints import Endpoints
+from ..misc.redaction import redact_model
 from ..network.utils import json_from_response
 
 if TYPE_CHECKING:
     from ...client import FlashForgeClient
+
+logger = logging.getLogger(__name__)
 
 
 # Firmware-reported PIDs from FlashForge's /detail endpoint. These are stable
@@ -267,8 +271,14 @@ class MachineInfoParser:
             return machine_info
 
         except Exception as error:
-            print(f"Error in MachineInfoParser.from_detail: {error}")
-            print(f"Detail object causing error: {detail}")
+            logger.warning(
+                "Could not parse the /detail payload into FFMachineInfo; the caller sees "
+                "this as an unreachable printer. %s",
+                error,
+            )
+            # Redacted: this dump carries the MAC, IP and cloud registration
+            # codes, and it exists to be pasted into a bug report.
+            logger.debug("Detail object that failed to parse: %s", redact_model(detail))
             return None
 
     @staticmethod
@@ -303,7 +313,7 @@ class MachineInfoParser:
             return state_mapping[valid_status]
 
         if valid_status:
-            print(f"Unknown machine status received: '{status}'")
+            logger.warning("Unknown machine status received: %r", status)
         return MachineState.UNKNOWN
 
 
@@ -384,12 +394,17 @@ class Info:
                 headers={"Content-Type": "application/json"},
             ) as response:
                 if response.status != 200:
-                    print(f"Non-200 status from detail endpoint: {response.status}")
+                    logger.warning("Non-200 status from the /detail endpoint: %s", response.status)
                     return None
 
                 data = await json_from_response(response)
                 return DetailResponse(**data)
 
         except Exception as error:
-            print(f"GetDetailResponse Request error: {error}")
+            logger.warning(
+                "Could not read /detail; callers cannot tell this from an unreachable "
+                "printer or a rejected check code, so this line is the only record of "
+                "the real cause. %s",
+                error,
+            )
             return None

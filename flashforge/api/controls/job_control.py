@@ -4,6 +4,7 @@ FlashForge Python API - Job Control Module
 
 import base64
 import json
+import logging
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -19,11 +20,14 @@ from ...models.responses import (
     Creator5UploadParams,
 )
 from ..constants.endpoints import Endpoints
+from ..misc.redaction import redact_mapping
 from ..network.utils import NetworkUtils, json_from_response
 
 if TYPE_CHECKING:
     from ...client import FlashForgeClient
     from .control import Control
+
+logger = logging.getLogger(__name__)
 
 
 class JobControl:
@@ -136,14 +140,18 @@ class JobControl:
         file_path_obj = Path(file_path)
 
         if not file_path_obj.exists():
-            print(f"UploadFile error: File not found at {file_path}")
+            logger.warning("upload_file: file not found at %s", file_path)
             return False
 
         file_size = file_path_obj.stat().st_size
         file_name = file_path_obj.name
 
-        print(
-            f"Starting upload for {file_name}, Size: {file_size}, Start: {start_print}, Level: {level_before_print}"
+        logger.debug(
+            "Starting upload for %s (size=%s, start=%s, level=%s)",
+            file_name,
+            file_size,
+            start_print,
+            level_before_print,
         )
 
         try:
@@ -159,16 +167,16 @@ class JobControl:
 
             # Add additional headers for new firmware
             if self._is_new_firmware_version():
-                print("Using new firmware headers for upload.")
+                logger.debug("Using new firmware headers for upload.")
                 custom_headers["flowCalibration"] = "false"
                 custom_headers["useMatlStation"] = "false"
                 custom_headers["gcodeToolCnt"] = "0"
                 # Base64 encode "[]" which is "W10="
                 custom_headers["materialMappings"] = "W10="
             else:
-                print("Using old firmware headers for upload.")
+                logger.debug("Using old firmware headers for upload.")
 
-            print("Upload Request Headers:", custom_headers)
+            logger.debug("Upload request headers: %s", redact_mapping(custom_headers))
 
             # Create multipart form data
             async with aiohttp.ClientSession() as session:
@@ -183,26 +191,31 @@ class JobControl:
                         data=data,
                         headers=custom_headers,
                     ) as response:
-                        print(f"Upload Response Status: {response.status}")
+                        logger.debug("Upload response status: %s", response.status)
 
                         if response.status != 200:
-                            print(f"Upload failed: Printer responded with status {response.status}")
+                            logger.warning(
+                                "Upload failed: the printer responded with status %s",
+                                response.status,
+                            )
                             return False
 
                         result = await json_from_response(response)
-                        print("Upload Response Data:", result)
+                        logger.debug("Upload response data: %s", result)
 
                         if NetworkUtils.is_ok(result):
-                            print("Upload successful according to printer response.")
+                            logger.debug("Upload successful according to the printer response.")
                             return True
                         else:
-                            print(
-                                f"Upload failed: Printer response code={result.get('code')}, message={result.get('message')}"
+                            logger.warning(
+                                "Upload failed: printer response code=%s, message=%s",
+                                result.get("code"),
+                                result.get("message"),
                             )
                             return False
 
         except Exception as e:
-            print(f"UploadFile error: {e}")
+            logger.warning("upload_file error: %s", e)
             return False
 
     async def print_local_file(self, file_name: str, leveling_before_print: bool) -> bool:
@@ -252,7 +265,7 @@ class JobControl:
                 return NetworkUtils.is_ok(result)
 
         except Exception as error:
-            print(f"PrintLocalFile error: {error}")
+            logger.warning("print_local_file error: %s", error)
             raise error
 
     async def upload_file_ad5x(self, params: AD5XUploadParams) -> bool:
@@ -278,14 +291,19 @@ class JobControl:
         # Validate file exists
         file_path_obj = Path(params.file_path)
         if not file_path_obj.exists():
-            print(f"UploadFileAD5X error: File not found at {params.file_path}")
+            logger.warning("upload_file_ad5x: file not found at %s", params.file_path)
             return False
 
         file_size = file_path_obj.stat().st_size
         file_name = file_path_obj.name
 
-        print(
-            f"Starting AD5X upload for {file_name}, Size: {file_size}, Start: {params.start_print}, Level: {params.leveling_before_print}, Tools: {len(params.material_mappings)}"
+        logger.debug(
+            "Starting AD5X upload for %s (size=%s, start=%s, level=%s, tools=%s)",
+            file_name,
+            file_size,
+            params.start_print,
+            params.leveling_before_print,
+            len(params.material_mappings),
         )
 
         try:
@@ -310,7 +328,7 @@ class JobControl:
                 "Expect": "100-continue",
             }
 
-            print("AD5X Upload Request Headers:", custom_headers)
+            logger.debug("AD5X upload request headers: %s", redact_mapping(custom_headers))
 
             # Create multipart form data
             async with aiohttp.ClientSession() as session:
@@ -325,28 +343,33 @@ class JobControl:
                         data=data,
                         headers=custom_headers,
                     ) as response:
-                        print(f"AD5X Upload Response Status: {response.status}")
+                        logger.debug("AD5X upload response status: %s", response.status)
 
                         if response.status != 200:
-                            print(
-                                f"AD5X Upload failed: Printer responded with status {response.status}"
+                            logger.warning(
+                                "AD5X upload failed: the printer responded with status %s",
+                                response.status,
                             )
                             return False
 
                         result = await json_from_response(response)
-                        print("AD5X Upload Response Data:", result)
+                        logger.debug("AD5X upload response data: %s", result)
 
                         if NetworkUtils.is_ok(result):
-                            print("AD5X Upload successful according to printer response.")
+                            logger.debug(
+                                "AD5X upload successful according to the printer response."
+                            )
                             return True
                         else:
-                            print(
-                                f"AD5X Upload failed: Printer response code={result.get('code')}, message={result.get('message')}"
+                            logger.warning(
+                                "AD5X upload failed: printer response code=%s, message=%s",
+                                result.get("code"),
+                                result.get("message"),
                             )
                             return False
 
         except Exception as e:
-            print(f"UploadFileAD5X error: {e}")
+            logger.warning("upload_file_ad5x error: %s", e)
             return False
 
     async def start_ad5x_multi_color_job(self, params: AD5XLocalJobParams) -> bool:
@@ -371,7 +394,7 @@ class JobControl:
 
         # Validate file name
         if not params.file_name or params.file_name.strip() == "":
-            print("AD5X Multi-Color Job error: fileName cannot be empty")
+            logger.warning("AD5X multi-color job: fileName cannot be empty.")
             return False
 
         # Create payload with AD5X-specific parameters
@@ -411,7 +434,7 @@ class JobControl:
                 return NetworkUtils.is_ok(result)
 
         except Exception as error:
-            print(f"AD5X Multi-Color Job error: {error}")
+            logger.warning("AD5X multi-color job error: %s", error)
             raise error
 
     async def start_ad5x_single_color_job(self, params: AD5XSingleColorJobParams) -> bool:
@@ -432,7 +455,7 @@ class JobControl:
 
         # Validate file name
         if not params.file_name or params.file_name.strip() == "":
-            print("AD5X Single-Color Job error: fileName cannot be empty")
+            logger.warning("AD5X single-color job: fileName cannot be empty.")
             return False
 
         # Create payload with AD5X-specific parameters for single-color printing
@@ -463,7 +486,7 @@ class JobControl:
                 return NetworkUtils.is_ok(result)
 
         except Exception as error:
-            print(f"AD5X Single-Color Job error: {error}")
+            logger.warning("AD5X single-color job error: %s", error)
             raise error
 
     # --- Creator 5 / Creator 5 Pro ---
@@ -495,16 +518,21 @@ class JobControl:
         file_path_obj = Path(params.file_path)
 
         if not file_path_obj.exists():
-            print(f"upload_file_creator5 error: File not found at {params.file_path}")
+            logger.warning("upload_file_creator5: file not found at %s", params.file_path)
             return False
 
         file_size = file_path_obj.stat().st_size
         file_name = file_path_obj.name
 
-        print(
-            f"Starting Creator 5 upload for {file_name}, Size: {file_size}, "
-            f"Start: {params.start_print}, Level: {params.leveling_before_print}, "
-            f"MatlStation: {params.use_matl_station}, Tools: {params.gcode_tool_cnt}"
+        logger.debug(
+            "Starting Creator 5 upload for %s (size=%s, start=%s, level=%s, "
+            "matl_station=%s, tools=%s)",
+            file_name,
+            file_size,
+            params.start_print,
+            params.leveling_before_print,
+            params.use_matl_station,
+            params.gcode_tool_cnt,
         )
 
         try:
@@ -524,7 +552,7 @@ class JobControl:
                 "Expect": "100-continue",
             }
 
-            print("Creator 5 Upload Request Headers:", custom_headers)
+            logger.debug("Creator 5 upload request headers: %s", redact_mapping(custom_headers))
 
             # Create multipart form data
             async with aiohttp.ClientSession() as session:
@@ -539,30 +567,33 @@ class JobControl:
                         data=data,
                         headers=custom_headers,
                     ) as response:
-                        print(f"Creator 5 Upload Response Status: {response.status}")
+                        logger.debug("Creator 5 upload response status: %s", response.status)
 
                         if response.status != 200:
-                            print(
-                                f"Creator 5 Upload failed: Printer responded with "
-                                f"status {response.status}"
+                            logger.warning(
+                                "Creator 5 upload failed: the printer responded with status %s",
+                                response.status,
                             )
                             return False
 
                         result = await json_from_response(response)
-                        print("Creator 5 Upload Response Data:", result)
+                        logger.debug("Creator 5 upload response data: %s", result)
 
                         if NetworkUtils.is_ok(result):
-                            print("Creator 5 Upload successful according to printer response.")
+                            logger.debug(
+                                "Creator 5 upload successful according to the printer response."
+                            )
                             return True
 
-                        print(
-                            "Creator 5 Upload failed: Printer response code="
-                            f"{result.get('code')}, message={result.get('message')}"
+                        logger.warning(
+                            "Creator 5 upload failed: printer response code=%s, message=%s",
+                            result.get("code"),
+                            result.get("message"),
                         )
                         return False
 
         except Exception as e:
-            print(f"upload_file_creator5 error: {e}")
+            logger.warning("upload_file_creator5 error: %s", e)
             return False
 
     async def start_creator5_job(self, params: Creator5JobParams) -> bool:
@@ -591,7 +622,7 @@ class JobControl:
             return False
 
         if not params.file_name or params.file_name.strip() == "":
-            print("Creator 5 Job error: fileName cannot be empty")
+            logger.warning("Creator 5 job: fileName cannot be empty.")
             return False
 
         has_mappings = params.material_mappings is not None and len(params.material_mappings) > 0
@@ -634,7 +665,7 @@ class JobControl:
                 return NetworkUtils.is_ok(result)
 
         except Exception as error:
-            print(f"Creator 5 Job error: {error}")
+            logger.warning("Creator 5 job error: %s", error)
             raise error
 
     def _validate_material_station_printer(self) -> bool:
@@ -648,9 +679,8 @@ class JobControl:
             True if the printer supports material mappings, False otherwise.
         """
         if not self.client.is_ad5x and not self.client.is_creator5:
-            print(
-                "Material-station job error: this method requires an AD5X or "
-                "Creator 5 series printer"
+            logger.warning(
+                "Material-station job: this method requires an AD5X or Creator 5 series printer."
             )
             return False
         return True
@@ -698,45 +728,53 @@ class JobControl:
         if not material_mappings or len(material_mappings) == 0:
             if allow_empty:
                 return True
-            print(f"{label} error: materialMappings array cannot be empty for multi-color jobs")
+            logger.warning("%s: materialMappings cannot be empty for multi-color jobs.", label)
             return False
 
         if len(material_mappings) > 4:
-            print(f"{label} error: Maximum 4 material mappings allowed")
+            logger.warning("%s: a maximum of 4 material mappings is allowed.", label)
             return False
 
         hex_color_regex = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
         for i, mapping in enumerate(material_mappings):
             if mapping.tool_id < 0 or mapping.tool_id > 3:
-                print(
-                    f"{label} error: toolId must be between 0-3, "
-                    f"got {mapping.tool_id} at index {i}"
+                logger.warning(
+                    "%s: toolId must be between 0-3, got %s at index %s",
+                    label,
+                    mapping.tool_id,
+                    i,
                 )
                 return False
 
             if mapping.slot_id < 1 or mapping.slot_id > 4:
-                print(
-                    f"{label} error: slotId must be between 1-4, "
-                    f"got {mapping.slot_id} at index {i}"
+                logger.warning(
+                    "%s: slotId must be between 1-4, got %s at index %s",
+                    label,
+                    mapping.slot_id,
+                    i,
                 )
                 return False
 
             if not mapping.material_name or mapping.material_name.strip() == "":
-                print(f"{label} error: materialName cannot be empty at index {i}")
+                logger.warning("%s: materialName cannot be empty at index %s", label, i)
                 return False
 
             if not hex_color_regex.match(mapping.tool_material_color):
-                print(
-                    f"{label} error: toolMaterialColor must be in "
-                    f"#RRGGBB format, got {mapping.tool_material_color} at index {i}"
+                logger.warning(
+                    "%s: toolMaterialColor must be in #RRGGBB format, got %s at index %s",
+                    label,
+                    mapping.tool_material_color,
+                    i,
                 )
                 return False
 
             if not hex_color_regex.match(mapping.slot_material_color):
-                print(
-                    f"{label} error: slotMaterialColor must be in "
-                    f"#RRGGBB format, got {mapping.slot_material_color} at index {i}"
+                logger.warning(
+                    "%s: slotMaterialColor must be in #RRGGBB format, got %s at index %s",
+                    label,
+                    mapping.slot_material_color,
+                    i,
                 )
                 return False
 
@@ -750,7 +788,7 @@ class JobControl:
             True if the printer is AD5X, false otherwise
         """
         if not self.client.is_ad5x:
-            print("AD5X Job error: This method can only be used with AD5X printers")
+            logger.warning("AD5X job: this method can only be used with AD5X printers.")
             return False
         return True
 
@@ -781,7 +819,7 @@ class JobControl:
             json_string = json.dumps(json_array)
             return base64.b64encode(json_string.encode("utf-8")).decode("utf-8")
         except Exception as error:
-            print("Failed to encode material mappings to base64:", error)
+            logger.warning("Failed to encode the material mappings to base64: %s", error)
             raise Exception(
                 "Failed to encode material mappings for upload"
             ) from error  # noqa: B904

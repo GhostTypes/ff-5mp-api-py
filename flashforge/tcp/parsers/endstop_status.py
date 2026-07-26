@@ -4,9 +4,12 @@ FlashForge Python API - Endstop Status Parser
 Parses endstop and machine status information from M119 command responses.
 """
 
+import logging
 import re
 from enum import Enum
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # Pre-compiled regex to match key:value pairs where value is an integer
 KV_PATTERN = re.compile(r"([A-Za-z0-9-]+):\s*(\d+)")
@@ -144,7 +147,7 @@ class EndstopStatus:
                     elif "BUSY" in machine_status:
                         self.machine_status = MachineStatus.BUSY
                     else:
-                        print(f"EndstopStatus: Encountered unknown MachineStatus: {machine_status}")
+                        logger.warning("EndstopStatus: unknown MachineStatus: %s", machine_status)
                         self.machine_status = MachineStatus.DEFAULT
                 elif line.startswith("MoveMode:"):
                     move_mode = line.replace("MoveMode:", "", 1).strip().upper()
@@ -159,7 +162,7 @@ class EndstopStatus:
                     elif "HOMING" in move_mode:
                         self.move_mode = MoveMode.HOMING
                     else:
-                        print(f"EndstopStatus: Encountered unknown MoveMode: {move_mode}")
+                        logger.warning("EndstopStatus: unknown MoveMode: %s", move_mode)
                         self.move_mode = MoveMode.DEFAULT
                 elif line.startswith("Status "):
                     self.status = Status(line)
@@ -184,9 +187,8 @@ class EndstopStatus:
             return self
 
         except Exception as e:
-            print("Unable to create EndstopStatus instance from replay")
-            print(f"Replay: {replay}")
-            print(f"Error: {e}")
+            logger.warning("Unable to create an EndstopStatus from the reply: %s", e)
+            logger.debug("Reply that failed to parse: %s", replay)
             return None
 
     def is_print_complete(self) -> bool:

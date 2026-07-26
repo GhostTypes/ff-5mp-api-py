@@ -6,8 +6,11 @@ Handles the parsing, storage, and manipulation of 3D print file thumbnail images
 
 import asyncio
 import base64
+import logging
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 class ThumbnailInfo:
@@ -65,7 +68,7 @@ class ThumbnailInfo:
             # Find where the PNG data starts (after the "ok" text delimiter)
             ok_index = replay.find("ok")
             if ok_index == -1:
-                print("ThumbnailInfo: No 'ok' found in response")
+                logger.warning("ThumbnailInfo: no 'ok' delimiter found in the response.")
                 return None
 
             # Skip the 'ok' text and any immediately following control characters
@@ -87,11 +90,11 @@ class ThumbnailInfo:
                 self._image_data = binary_buffer[png_start:]
                 return self
             else:
-                print("ThumbnailInfo: No PNG signature found in binary data")
+                logger.warning("ThumbnailInfo: no PNG signature found in the binary data.")
                 return None
 
         except Exception as e:
-            print(f"ThumbnailInfo: Error parsing response: {e}")
+            logger.warning("ThumbnailInfo: error parsing the response: %s", e)
             return None
 
     def get_image_data(self) -> str | None:
@@ -157,7 +160,7 @@ class ThumbnailInfo:
             True if the file was saved successfully, False otherwise
         """
         if not self._image_data:
-            print("ThumbnailInfo: No image data to save")
+            logger.warning("ThumbnailInfo: no image data to save.")
             return False
 
         try:
@@ -169,18 +172,20 @@ class ThumbnailInfo:
                 file_path = f"{base_name}.png"
 
             if not file_path:
-                print("ThumbnailInfo: No file path provided and no filename to generate one from")
+                logger.warning(
+                    "ThumbnailInfo: no file path provided and no filename to generate one from."
+                )
                 return False
 
             # Write the bytes to file in a separate thread to avoid blocking the event loop
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, self._write_file_sync, file_path, self._image_data)
 
-            print(f"ThumbnailInfo: Saved thumbnail to {file_path}")
+            logger.debug("ThumbnailInfo: saved the thumbnail to %s", file_path)
             return True
 
         except Exception as e:
-            print(f"ThumbnailInfo: Error saving thumbnail to file: {e}")
+            logger.warning("ThumbnailInfo: error saving the thumbnail to a file: %s", e)
             return False
 
     def save_to_file_sync(self, file_path: str | None = None) -> bool:
@@ -194,7 +199,7 @@ class ThumbnailInfo:
             True if the file was saved successfully, False otherwise
         """
         if not self._image_data:
-            print("ThumbnailInfo: No image data to save")
+            logger.warning("ThumbnailInfo: no image data to save.")
             return False
 
         try:
@@ -206,18 +211,20 @@ class ThumbnailInfo:
                 file_path = f"{base_name}.png"
 
             if not file_path:
-                print("ThumbnailInfo: No file path provided and no filename to generate one from")
+                logger.warning(
+                    "ThumbnailInfo: no file path provided and no filename to generate one from."
+                )
                 return False
 
             # Write the bytes to file
             with open(file_path, "wb") as f:
                 f.write(self._image_data)
 
-            print(f"ThumbnailInfo: Saved thumbnail to {file_path}")
+            logger.debug("ThumbnailInfo: saved the thumbnail to %s", file_path)
             return True
 
         except Exception as e:
-            print(f"ThumbnailInfo: Error saving thumbnail to file: {e}")
+            logger.warning("ThumbnailInfo: error saving the thumbnail to a file: %s", e)
             return False
 
     def get_image_size(self) -> tuple[int, int]:
