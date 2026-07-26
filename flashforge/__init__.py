@@ -69,6 +69,7 @@ from .discovery import (
     PrinterStatus,
     SocketCreationError,
 )
+from .exceptions import FlashForgeError, FlashForgeResponseError
 
 # Import key models for convenience
 from .models import (
@@ -127,7 +128,7 @@ from .tcp import (
 )
 
 FiveMClient = FlashForgeClient
-__version__ = "1.3.1"
+__version__ = "1.3.4"
 __author__ = "FlashForge Python API Contributors"
 __email__ = "notghosttypes@gmail.com"
 __description__ = "Python library for controlling FlashForge 3D printers"
@@ -138,6 +139,9 @@ __all__ = [
     "FlashForgeClient",
     "FiveMClient",
     "FiveMClientConnectionOptions",
+    # Exceptions
+    "FlashForgeError",
+    "FlashForgeResponseError",
     # Data models
     "FFMachineInfo",
     "FFPrinterDetail",

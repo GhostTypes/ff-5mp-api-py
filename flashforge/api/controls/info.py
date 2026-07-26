@@ -5,8 +5,9 @@ FlashForge Python API - Info Module
 import logging
 import re
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from ...exceptions import FlashForgeResponseError
 from ...models.machine_info import FFMachineInfo, MachineState, Temperature
 from ...models.responses import DetailResponse, FFPrinterDetail
 from ..constants.endpoints import Endpoints
@@ -165,6 +166,12 @@ class MachineInfoParser:
             )
             has_lidar = getattr(detail, "lidar", None) == 1
             has_door_sensor = is_creator5_pro
+            # Not every Creator 5 has the heated chamber. FFPrinterDetail maps
+            # the firmware's "no sensor" sentinel (-108) to None, so an absent
+            # reading is the signal - never the model family, which is what left
+            # chamber-less units with three entities pinned at 0 C.
+            chamber_temp_value = getattr(detail, "chamber_temp", None)
+            has_chamber_sensor = chamber_temp_value is not None
 
             # Immutable model name resolution: prefer the firmware `model`
             # field, then a PID-derived name, then the user-set name.
@@ -237,6 +244,7 @@ class MachineInfoParser:
                 has_camera=has_camera,
                 has_lidar=has_lidar,
                 has_door_sensor=has_door_sensor,
+                has_chamber_sensor=has_chamber_sensor,
                 # Current print stats
                 print_duration=getattr(detail, "print_duration", 0) or 0,
                 print_file_name=getattr(detail, "print_file_name", "") or "",
@@ -338,21 +346,41 @@ class Info:
         This method fetches detailed data from the printer and transforms it.
 
         Returns:
-            An FFMachineInfo object, or None if an error occurs or no data is returned.
+            An FFMachineInfo object, or None if the printer could not be reached.
+
+        Raises:
+            FlashForgeResponseError: The printer answered but the payload could
+                not be understood. Distinct from a None return, which means the
+                request never got through.
         """
         detail_response = await self.get_detail_response()
-        if detail_response and detail_response.detail:
-            return MachineInfoParser.from_detail(detail_response.detail)
-        return None
+        if detail_response is None or detail_response.detail is None:
+            return None
+
+        machine_info = MachineInfoParser.from_detail(detail_response.detail)
+        if machine_info is None:
+            # We validated the payload but could not build our own model from
+            # it - that is a bug on our side, not an unreachable printer, and
+            # reporting it as the latter is what issue #18 was about.
+            raise FlashForgeResponseError(
+                "The /detail payload was read but could not be converted into machine info",
+                endpoint=Endpoints.DETAIL,
+            )
+        return machine_info
 
     async def is_printing(self) -> bool:
         """
         Checks if the printer is currently in the "printing" state.
 
+        These three convenience wrappers keep their documented "return the
+        fallback on any failure" contract, so a caller polling for a boolean is
+        not forced to handle an exception. The failure is still logged, and
+        callers that need to distinguish causes should use `get()` directly.
+
         Returns:
             True if the printer is printing, False otherwise or if status cannot be determined.
         """
-        info = await self.get()
+        info = await self._get_or_none()
         return info.status == "printing" if info else False
 
     async def get_status(self) -> str | None:
@@ -362,7 +390,7 @@ class Info:
         Returns:
             The status string, or None if it cannot be determined.
         """
-        info = await self.get()
+        info = await self._get_or_none()
         return info.status if info else None
 
     async def get_machine_state(self) -> MachineState | None:
@@ -372,17 +400,34 @@ class Info:
         Returns:
             A MachineState enum value, or None if it cannot be determined.
         """
-        info = await self.get()
+        info = await self._get_or_none()
         return info.machine_state if info else None
 
-    async def get_detail_response(self) -> DetailResponse | None:
+    async def _get_or_none(self) -> FFMachineInfo | None:
+        """Call `get()`, absorbing a response error into a None for the convenience wrappers."""
+        try:
+            return await self.get()
+        except FlashForgeResponseError as error:
+            logger.warning("Could not read machine info: %s", error)
+            return None
+
+    async def get_detail_raw(self) -> dict[str, Any] | None:
         """
-        Retrieves the raw detailed response from the printer's detail endpoint.
-        This contains a wealth of information about the printer's current state.
+        Retrieves the /detail response as the plain decoded JSON dict, with no
+        model validation applied.
+
+        This exists so callers can inspect identity fields - above all `pid` -
+        without first having to successfully validate the ~50 unrelated fields
+        in the payload. A supported printer must never be rejected because of a
+        field that has nothing to do with whether it is supported (issue #18).
 
         Returns:
-            A DetailResponse object containing the raw printer details,
-            or None if the request fails or an error occurs.
+            The decoded response body, or None if the printer could not be
+            reached or answered with a non-200 status.
+
+        Raises:
+            FlashForgeResponseError: The printer answered with a body that is
+                not decodable JSON.
         """
         payload = {"serialNumber": self.client.serial_number, "checkCode": self.client.check_code}
 
@@ -396,15 +441,57 @@ class Info:
                 if response.status != 200:
                     logger.warning("Non-200 status from the /detail endpoint: %s", response.status)
                     return None
-
                 data = await json_from_response(response)
-                return DetailResponse(**data)
-
         except Exception as error:
             logger.warning(
-                "Could not read /detail; callers cannot tell this from an unreachable "
-                "printer or a rejected check code, so this line is the only record of "
-                "the real cause. %s",
+                "Could not reach the printer's /detail endpoint. This is a transport "
+                "failure (unreachable printer, timeout, or refused connection), not a "
+                "payload the library failed to read. %s",
                 error,
             )
             return None
+
+        if not isinstance(data, dict):
+            raise FlashForgeResponseError(
+                f"The /detail endpoint returned {type(data).__name__}, expected a JSON object",
+                endpoint=Endpoints.DETAIL,
+            )
+        return data
+
+    async def get_detail_response(self) -> DetailResponse | None:
+        """
+        Retrieves the validated detailed response from the printer's detail endpoint.
+        This contains a wealth of information about the printer's current state.
+
+        Returns:
+            A DetailResponse object containing the raw printer details, or None
+            if the printer could not be reached.
+
+        Raises:
+            FlashForgeResponseError: The printer answered, but the body did not
+                validate. Callers should surface this differently from a None
+                return: None means "we never got an answer", this means "the
+                answer was not one we could read", and only the second is
+                actionable as a bug report.
+        """
+        data = await self.get_detail_raw()
+        if data is None:
+            return None
+
+        try:
+            return DetailResponse(**data)
+        except Exception as error:
+            logger.warning(
+                "The printer answered /detail with a payload that failed validation. This "
+                "is NOT a connectivity problem - please report it with the debug dump "
+                "below. %s",
+                error,
+            )
+            # Redacted: this dump carries the MAC, IP and cloud registration
+            # codes, and it exists to be pasted into a bug report.
+            logger.debug("Payload that failed validation: %s", redact_model(data))
+            raise FlashForgeResponseError(
+                "The printer's /detail response could not be validated",
+                endpoint=Endpoints.DETAIL,
+                cause=error,
+            ) from error

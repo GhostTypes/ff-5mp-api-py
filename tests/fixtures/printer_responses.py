@@ -107,6 +107,20 @@ CREATOR_5_INFO_RESPONSE = {
     },
 }
 
+# A Creator 5 WITHOUT the heated chamber option, as reported in issue #18. The
+# heated chamber is a Creator 5 extra, not a family trait, and firmware signals
+# its absence with the -108 sentinel rather than by omitting `chamberTemp`. This
+# payload is the regression case: it must parse, and it must NOT produce a
+# -108 C reading or a chamber entity.
+CREATOR_5_NO_CHAMBER_INFO_RESPONSE = {
+    "code": 0,
+    "detail": {
+        **CREATOR_5_INFO_RESPONSE["detail"],
+        "chamberTemp": -108,
+        "chamberTargetTemp": -108,
+    },
+}
+
 CREATOR_5_PRO_INFO_RESPONSE = {
     "code": 0,
     "detail": {

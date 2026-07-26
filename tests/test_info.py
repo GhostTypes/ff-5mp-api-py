@@ -7,8 +7,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from flashforge.api.controls.info import Info
+from flashforge.api.constants.endpoints import Endpoints
+from flashforge.api.controls.info import Info, MachineInfoParser
 from flashforge.client import FlashForgeClient
+from flashforge.exceptions import FlashForgeResponseError
 from flashforge.models import FFMachineInfo, MachineState
 from flashforge.models.responses import DetailResponse
 from tests.fixtures.printer_responses import (
@@ -124,3 +126,85 @@ async def test_get_detail_response_http_error():
         detail = await info.get_detail_response()
 
     assert detail is None
+
+
+# ---------------------------------------------------------------------------
+# Transport failure vs. content failure
+#
+# These two must not look alike to callers. A None return means we never got an
+# answer - check the network. A FlashForgeResponseError means the printer
+# answered with something we could not read - that is a bug to report. Issue #18
+# spent three releases blaming the network for a schema problem because both
+# paths returned None.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_unparseable_payload_raises_rather_than_returning_none():
+    """A body that fails validation is a response error, not an absent printer."""
+    info = _build_info()
+    # `detail` is required on DetailResponse, so omitting it fails validation
+    # for a reason that has nothing to do with connectivity.
+    mock_session = _mock_session({"code": 0})
+
+    with patch("aiohttp.ClientSession", return_value=mock_session):
+        with pytest.raises(FlashForgeResponseError) as excinfo:
+            await info.get_detail_response()
+
+    assert Endpoints.DETAIL in str(excinfo.value)
+
+
+@pytest.mark.asyncio
+async def test_non_object_body_raises():
+    """A JSON body that is not an object cannot be a /detail response."""
+    info = _build_info()
+    mock_session = _mock_session(["not", "an", "object"])
+
+    with patch("aiohttp.ClientSession", return_value=mock_session):
+        with pytest.raises(FlashForgeResponseError):
+            await info.get_detail_raw()
+
+
+@pytest.mark.asyncio
+async def test_get_detail_raw_skips_validation_entirely():
+    """The raw accessor hands back identity fields even from a payload we could
+    not validate - this is what lets the config flow read `pid` first."""
+    info = _build_info()
+    mock_session = _mock_session({"code": 0, "detail": {"pid": 40, "chamberTemp": -108}})
+
+    with patch("aiohttp.ClientSession", return_value=mock_session):
+        raw = await info.get_detail_raw()
+
+    assert raw["detail"]["pid"] == 40
+
+
+@pytest.mark.asyncio
+async def test_get_raises_when_conversion_fails():
+    """A payload we validated but could not convert is still a response error."""
+    info = _build_info()
+    detail_response = DetailResponse(**FIVE_M_PRO_INFO_RESPONSE)
+    info.get_detail_response = AsyncMock(return_value=detail_response)
+
+    with patch.object(MachineInfoParser, "from_detail", return_value=None):
+        with pytest.raises(FlashForgeResponseError):
+            await info.get()
+
+
+@pytest.mark.asyncio
+async def test_get_returns_none_when_printer_unreachable():
+    """An unreachable printer is still a plain None - callers rely on that."""
+    info = _build_info()
+    info.get_detail_response = AsyncMock(return_value=None)
+
+    assert await info.get() is None
+
+
+@pytest.mark.asyncio
+async def test_convenience_wrappers_absorb_response_errors():
+    """is_printing/get_status/get_machine_state keep their documented fallbacks."""
+    info = _build_info()
+    info.get = AsyncMock(side_effect=FlashForgeResponseError("bad payload"))
+
+    assert await info.is_printing() is False
+    assert await info.get_status() is None
+    assert await info.get_machine_state() is None

@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4] - 2026-07-26
+
+### Fixed
+
+- **A single out-of-range field no longer costs the caller the entire `/detail` response.** A Creator 5 with no heated chamber reports `chamberTemp: -108` — the firmware's "this sensor does not exist" sentinel, a sibling of the `-100` this library itself sends as `TEMP_OFF`. `FFPrinterDetail.chamber_temp` carried `ge=-50`, so that one value failed validation for the whole model, `get_detail_response` returned `None`, and `ff-5mp-hass` reported an unreachable printer. Three releases went into `ff-5mp-hass#18` on the assumption it was a network or credential problem. The temperature fields now map any value at or below `-50` to `None`, so "no sensor" reads as "not reported" rather than as a `-108 °C` reading or a hard failure; `MachineInfoParser` exposes this as the new `FFMachineInfo.has_chamber_sensor`, which consumers should gate chamber entities on instead of the Creator 5 model family (the chamber is an option within it, not a family trait).
+
+- **Every remaining range constraint was removed from inbound models, not just the one that was reported.** Fixing `chamberTemp` alone would only have relocated the next outage: `tvoc`, `printSpeedAdjust`, `zAxisCompensation`, `fillAmount`, `remainingDiskSpace`, `nozzleCnt` and ~20 more each carried a `ge`/`le` that could fail the entire response on a firmware revision or an unusual state. Pydantic validates a model all-or-nothing, so a constraint on a field nobody reads is enough to take a consumer down. `FFPrinterDetail`, `Temperature`, `SlotInfo`, `MatlStationInfo`, `IndepMatlInfo`, `FFGcodeToolData`, and `FFGcodeFileEntry` now validate types but not value ranges. Outbound request models (`AD5X*Params`, `Creator5*Params`, `FilamentArgs`, `AD5XMaterialMapping`) keep their constraints, where a bad value is our own bug rather than a firmware difference. This matches the TypeScript client (`ff-5mp-api-ts`), which takes what it needs from a response and has never hit this class of failure.
+
+- **Nested inbound models no longer fail the parent over a missing or unusual field.** `SlotInfo` required `hasFilament`, `materialColor`, `materialName`, and `slotId`, so one absent attribute on one slot failed the whole `/detail` response; all four are now defaulted. Its hex-color validator *raised* on anything that was not `#RRGGBB` or empty — it now normalizes (expanding `#RGB`, adding a missing `#`) and degrades to an empty string, because an unrecognized color should cost a swatch its color, not cost the caller every entity. `MatlStationInfo.slot_infos` carried `min_length=1`, which made an explicitly empty `slotInfos: []` — a station with nothing loaded — invalid, and `max_length=4`, which would have failed on any future larger station.
+
+### Added
+
+- **`FlashForgeResponseError`, so callers can tell "unreadable answer" from "no answer".** Every failure path returned `None`, which meant a schema mismatch was indistinguishable from an unreachable printer — the reason `ff-5mp-hass#18` spent three releases pointing its reporter at the network. `get_detail_response()` now *raises* when the printer answered with a body that failed validation, and still returns `None` when the request never got through. `info.get()` raises the same error when a validated payload cannot be converted into `FFMachineInfo`. The convenience wrappers (`is_printing`, `get_status`, `get_machine_state`) keep their documented fallback returns and absorb it, so only callers that asked for the distinction have to handle it.
+
+- **`Info.get_detail_raw()`**, returning the decoded `/detail` JSON with no model validation. This lets a consumer read identity fields — above all `pid` — without first validating ~50 unrelated fields, so a supported printer can no longer be rejected because of a field that has nothing to do with whether it is supported.
+
+- **`FFMachineInfo.has_chamber_sensor`**, set from whether the printer actually reported a chamber temperature.
+
+### Changed
+
+- **`__init__.py` reported `__version__ = "1.3.1"` while `pyproject.toml` said `1.3.3`.** Both now read `1.3.4`.
+
+- **`CLAUDE.md`'s "Why TCP Bootstrap Is Still Required for Modern Printers" section described behavior the library deliberately does not have.** It claimed `client.initialize()` performs a TCP `M115` alongside the authenticated `/detail` call, but `verify_connection()` has decided `http_only` from the parsed model *before* touching TCP since the Creator 5 work — that family exposes no service on 8899, where an `M115` would hang until the connect timeout rather than fail fast. Model detection is PID-based end to end: the UDP discovery packet before pairing, `/detail` after. Rewritten as "Model Detection Without TCP", with the `http_only` guard stated as the rule and the two remaining ungated legacy call sites (`init_control`, `get_temperatures`, neither used by `ff-5mp-hass`) flagged. No code change — the guard and `tests/test_http_only_guard.py` were already correct; the document that exists to stop agents reintroducing TCP was the thing telling them to.
+
 ## [1.3.3] - 2026-07-26
 
 ### Changed

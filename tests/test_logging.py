@@ -17,6 +17,7 @@ import pytest
 
 from flashforge.api.misc.redaction import redact_mapping, redact_model
 from flashforge.client import FlashForgeClient
+from flashforge.exceptions import FlashForgeResponseError
 
 INFO_LOGGER = "flashforge.api.controls.info"
 CONTROL_LOGGER = "flashforge.api.controls.control"
@@ -160,13 +161,14 @@ def test_redact_model_never_raises_on_an_odd_object():
 
 
 @pytest.mark.asyncio
-async def test_detail_parse_failure_is_logged(caplog):
-    """A /detail that will not parse must say so.
+async def test_detail_parse_failure_raises_and_is_logged(caplog):
+    """A /detail that will not parse must say so, and must not look like an outage.
 
-    `get_detail_response` returns None for every failure, and ff-5mp-hass turns
-    that into "Failed to connect ... check the IP address and credentials". The
-    log line is the only thing that distinguishes a parse failure from a real
-    connection problem or a wrong check code.
+    This used to return None like every other failure, so ff-5mp-hass reported
+    it as "Failed to connect ... check the IP address and credentials" and the
+    log line was the only record of the real cause. It now raises
+    FlashForgeResponseError, so the caller can tell the user the truth - the log
+    line stays as the detail.
     """
     client = _build_client()
     # `code` is required by GenericResponse, so this fails validation regardless
@@ -175,10 +177,11 @@ async def test_detail_parse_failure_is_logged(caplog):
 
     with caplog.at_level(logging.WARNING, logger=INFO_LOGGER):
         with patch.object(client, "get_http_session", AsyncMock(return_value=mock_session)):
-            result = await client.info.get_detail_response()
+            with pytest.raises(FlashForgeResponseError):
+                await client.info.get_detail_response()
 
-    assert result is None
-    assert "Could not read /detail" in caplog.text
+    assert "failed validation" in caplog.text
+    assert "NOT a connectivity problem" in caplog.text
 
 
 @pytest.mark.asyncio

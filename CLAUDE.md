@@ -285,12 +285,32 @@ Two things this rule is easy to get half-right:
 
 The one cost of `extra="allow"` on inbound models: a typo'd `alias=` stops raising and silently becomes an extra field. Keep asserting on parsed *values* in fixtures rather than just successful construction, which is what still catches it.
 
-### Why TCP Bootstrap Is Still Required for Modern Printers
-The HTTP `/detail` endpoint requires authentication (`serialNumber` + `checkCode` via `FNetCode`). During discovery and the very first connection attempt — before a check code has been entered — there are no credentials, so the parser cannot read `pid` from `/detail`. The library handles this by:
+**`extra="allow"` was only ever half the rule — the other half is value constraints and required fields.** Extras were fixed in 1.3.2 and the very next release still shipped a total outage from the same underlying cause, because `chamberTemp` carried `ge=-50`. The generalized rule, as of 1.3.4:
 
-1. Discovery (UDP) returns the printer's USB-style PID in the broadcast packet, which `discovery/discovery.py` already maps to a `PrinterModel`. Consumers can use this to pre-select a model class before pairing.
-2. After a check code is provided, `client.initialize()` performs both an authenticated `/detail` call and an unauthenticated TCP `M115` (`tcp_client.get_printer_info()`). The TCP `M115` response carries `Machine Type` (firmware-controlled, e.g. `"FlashForge Adventurer 5M Pro"`) which is safe to substring-match for capability inference; do NOT use the M115 `Machine Name` field for that — like `detail.name` it is user-set.
-3. Once `verify_connection()` finishes, `FFMachineInfo.pid` / `is_pro` / `is_ad5x` are authoritative. All later capability gating should read those, not re-parse strings.
+> **Inbound models validate types. They do not validate ranges, and they require only what the payload is meaningless without.**
+
+Three reasons this is not negotiable:
+
+1. **Pydantic fails a model as a unit.** A constraint on a field no consumer reads is enough to lose every other field in the response. `get_detail_response` turned that into "no data", which `ff-5mp-hass` showed as an offline printer — so `ge=-50` on one optional temperature made a whole printer configuration unusable and reported it as a network fault.
+2. **Firmware uses out-of-band values as signals, not as errors.** Absent hardware is reported with a sentinel rather than by omitting the field: a Creator 5 with no chamber heater sends `chamberTemp: -108`, and this library itself sends `-100` as `TEMP_OFF`. Values that look impossible are routine, and the correct response is to normalize them (see `sanitize_temperature` in `models/machine_info.py`), never to reject the payload.
+3. **We do not own the schema.** Every constraint is a guess about firmware we have not seen, and the cost of guessing wrong is total rather than proportional. The TypeScript client (`ff-5mp-api-ts`) takes what it needs from a response and has never hit this failure class — that is the behavior to match.
+
+Range constraints remain correct on **outbound** models (`AD5XMaterialMapping`, `Creator5UploadParams`, `FilamentArgs`, …), where the values are ours and a bad one is our bug, caught before it reaches the printer. When adding an inbound field: give it a default, give it no range, and if it needs bounds to be useful, clamp or normalize it in `MachineInfoParser`.
+
+**Distinguish "no answer" from "an answer we could not read".** Returning `None` for both is what made `ff-5mp-hass#18` take three releases to diagnose — the printer was reachable and the credentials were correct, but every signal the library emitted said otherwise. `get_detail_response()` returns `None` only for transport failures and raises `FlashForgeResponseError` when the body failed validation; `info.get()` raises it when a validated payload cannot be converted. `get_detail_raw()` exists so consumers can read identity fields (`pid`) without validating the rest of the payload first. Preserve this split in any new endpoint: a caller that cannot tell the two apart cannot tell its user anything useful.
+
+### Model Detection Without TCP
+**TCP is never required for model detection, and the Creator 5 / Creator 5 Pro have no TCP service at all** — nothing listens on 8899, so an `M115` handshake there does not fail fast, it hangs until the connect timeout. Detection is PID-based end to end:
+
+1. **Before pairing:** discovery (UDP) returns the printer's PID in the broadcast packet, which `discovery/discovery.py` maps to a `PrinterModel`. This is what resolves the bootstrap problem — `/detail` needs `serialNumber` + `checkCode` (via `FNetCode`), which do not exist yet at discovery time, and the UDP packet needs no credentials.
+2. **After a check code is provided:** the authenticated `/detail` call carries the same firmware-set `pid`, which `MachineInfoParser.from_detail` turns into `is_pro` / `is_ad5x` / `is_creator5` / `is_creator5_pro`.
+3. **From then on:** `FFMachineInfo.pid` and those flags are authoritative. Never re-parse strings, and never substring-match `detail.name` — it is user-set (broke `ff-5mp-hass` in v1.1.8, see issue #13).
+
+`verify_connection()` decides `http_only` from the parsed model *before* touching TCP (`client.py:408`), so the Creator 5 series never opens a socket; an explicit `http_only_override` always wins. Guarded by `tests/test_http_only_guard.py` — keep any new TCP call site behind `if not self._http_only`.
+
+TCP `M115` remains available for older printers that actually serve it, and its `Machine Type` field (firmware-controlled, e.g. `"FlashForge Adventurer 5M Pro"`) is safe to read where it exists — its `Machine Name` field is not, being user-set like `detail.name`. It is a legacy path, not part of model detection.
+
+> Known gap: `client.initialize()` → `init_control()` (`client.py:262`) and `get_temperatures()` (`client.py:531`) call the TCP client unguarded and would hang on a Creator 5. Neither is used by `ff-5mp-hass`. Gate them before calling either from new code.
 
 ### Error Handling
 - HTTP errors: Wrapped in aiohttp exceptions
