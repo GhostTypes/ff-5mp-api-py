@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 FlashForge Python API is a comprehensive Python library for controlling FlashForge 3D printers. The library provides **dual-protocol** support:
-- **HTTP API**: Modern REST-like API for Adventurer 5M/5X series printers
+- **HTTP API**: Modern REST-like API for Adventurer 5M/5X and Creator 5 series printers
 - **TCP/G-code API**: Legacy protocol supporting all networked FlashForge printers
 
 The architecture is fully async/await throughout and uses Pydantic for type-safe data models.
@@ -26,7 +26,7 @@ The library has a layered client architecture:
      - `info`: Status and machine information
      - `files`: File operations (upload/download/list)
      - `temp_control`: Temperature settings
-   - Automatically detects printer capabilities (is_ad5x, is_pro) based on model
+   - Automatically detects printer capabilities (is_ad5x, is_pro, is_creator5, is_creator5_pro) based on model
 
 2. **`flashforge.tcp.ff_client.FlashForgeClient`** (TCP high-level client)
    - Extends `FlashForgeTcpClient`
@@ -69,7 +69,8 @@ flashforge/
 │   │   ├── job_control.py      # JobControl class
 │   │   ├── info.py             # Info class
 │   │   ├── files.py            # Files class (named 'files' for user API)
-│   │   └── temp_control.py     # TempControl class
+│   │   ├── temp_control.py     # TempControl class
+│   │   └── creator5_palette.py # Creator 5 material-station palette (CIEDE2000)
 │   ├── network/                # Network utilities
 │   │   ├── utils.py            # NetworkUtils for HTTP requests
 │   │   └── fnet_code.py        # FNetCode for authentication
@@ -84,7 +85,7 @@ flashforge/
 
 **Dual Protocol Strategy**: HTTP is used for high-level operations (printer status, file listing, job control commands) while TCP/G-code is used for real-time operations (temperature monitoring via M105, print progress via M27, thumbnails via M662).
 
-**Model Detection**: `MachineInfoParser.from_detail()` derives `is_pro` / `is_ad5x` on `FFMachineInfo` from the firmware-set integer `pid` field on `/detail` (35 = Adventurer 5M, 36 = 5M Pro, 38 = AD5X — see `KNOWN_HTTP_PIDS` in `flashforge/api/controls/info.py`). The `pid` value is also passed through to `FFMachineInfo.pid` for downstream consumers. When `pid` is absent (older firmware) the parser falls back to a name+capability heuristic, but new code should NOT rely on substring-matching `detail.name` — that field is user-mutable via the printer's LCD or cloud account and changing it broke detection in pre-1.2.3 builds (see CHANGELOG entry for 1.2.3, ref `ff-5mp-hass#13`).
+**Model Detection**: `MachineInfoParser.from_detail()` derives `is_pro` / `is_ad5x` / `is_creator5` / `is_creator5_pro` on `FFMachineInfo` from the firmware-set integer `pid` field on `/detail` (35 = Adventurer 5M, 36 = 5M Pro, 38 = AD5X, plus Creator 5 / Creator 5 Pro PIDs — see `KNOWN_HTTP_PIDS` and the `PID_*` constants in `flashforge/api/controls/info.py`). The `pid` value is also passed through to `FFMachineInfo.pid` for downstream consumers. When `pid` is absent (older firmware) the parser falls back to a name+capability heuristic, but new code should NOT rely on substring-matching `detail.name` — that field is user-mutable via the printer's LCD or cloud account and changing it broke detection in pre-1.2.3 builds (see CHANGELOG entry for 1.2.3, ref `ff-5mp-hass#13`). The Creator 5 series is **HTTP-only**: it exposes no TCP/8899 service, so `client._http_only` is true and the client routes temperature control through the HTTP `temperatureCtl_cmd` instead of TCP M105.
 
 **Parser Pattern**: TCP responses are parsed by specialized parser classes in `tcp/parsers/` that extract structured data from text responses (e.g., `M105` returns text like `T0:25/0 T1:25/0 B:25/0` which TempInfo parses).
 
@@ -206,7 +207,7 @@ twine check dist/*
 ```
 
 **Version Management**:
-- Current version: **1.3.0** (as of 2026-06-28)
+- Current version: **1.3.2** (as of 2026-07-26)
 - Package name: `flashforge-python-api`
 - PyPI: https://pypi.org/project/flashforge-python-api/
 - Build system: Hatchling (defined in `pyproject.toml`)
@@ -269,8 +270,20 @@ async with FlashForgeClient(ip, serial, check) as client:
 Certain features only work on specific models:
 - **LED control**: Adventurer 5M/5X only (check `client.led_control`)
 - **Filtration**: Adventurer 5M Pro only (check `client.filtration_control`)
+- **Per-nozzle & chamber temperature control, material-station slot configuration / color mapping**: Creator 5 / Creator 5 Pro only (HTTP `temperatureCtl_cmd`; slot colors snap to the firmware palette via CIEDE2000 in `api/controls/creator5_palette.py`)
 
-Capability flags (`client.is_pro`, `client.is_ad5x`) are populated from `FFMachineInfo` after `verify_connection()`, which itself reads `pid` off `/detail`. Trust those flags — do not re-derive them from `info.name`.
+Capability flags (`client.is_pro`, `client.is_ad5x`, `client.is_creator5`, `client.is_creator5_pro`) are populated from `FFMachineInfo` after `verify_connection()`, which itself reads `pid` off `/detail`. Trust those flags — do not re-derive them from `info.name`.
+
+**Never surface a raw `/detail` field as a capability flag, and never give a capability an "unknown" state.** Firmware omits fields that don't apply to a model, so an absent value means "not reported", not "no" — and any type that can hold `None` invites a consumer to read the two as the same thing. `hasMatlStation` is the known case: it is AD5X-only, and a Creator 5 Pro leaves it out of `/detail` entirely (verified on firmware 1.9.4) while reporting a fully populated `matlStationInfo` with four loaded slots. `FFMachineInfo.has_matl_station` is therefore **derived** in `MachineInfoParser.from_detail` (flag `is True` OR `slot_cnt > 0` OR non-empty `slot_infos`) and typed `bool`, not `bool | None`; the raw value stays on `FFPrinterDetail`. The same trap caught `led_control_override` downstream, where a caller's unset `False` was read as "force the capability off". Apply the rule to any new capability: derive it from the data the capability actually produces, give it no unknown state, and cover it with a fixture built from a real payload — the Creator 5 fixtures originally had no material station at all, which is why this went unnoticed through v1.3.1.
+
+**The rule for response models: `extra="allow"` on anything parsed from a printer response, `extra="forbid"` on anything this library constructs itself.** A model that forbids unknown fields turns a firmware addition into a parse failure, and every parse failure here degrades into something that looks like a working printer with less to report — or worse. `ff-5mp-hass#18` is the canonical case: `Product` forbade extras, so an unrecognized control-state flag raised `ValidationError`, `send_product_command` returned the same bare `False` it returns for bad credentials, and the user was told their check code was wrong when it was not.
+
+Two things this rule is easy to get half-right:
+
+1. **It applies to nested models, not just the top-level response.** A child that forbids extras fails validation for the entire response, so `FFPrinterDetail` being `extra="allow"` bought nothing while `MatlStationInfo` / `SlotInfo` / `IndepMatlInfo` underneath it still forbade them. Every model reachable from a parsed payload has to allow extras, all the way down.
+2. **The inverse half is load-bearing — do not strip `extra="forbid"` indiscriminately.** Outbound request-parameter models (`AD5XLocalJobParams`, `Creator5UploadParams`, `FilamentArgs`, …) are request bodies *we* build, so no firmware update can break them, and forbidding extras turns a caller's typo'd keyword into an error instead of a field the printer silently ignores. Same for `FFMachineInfo` and `Temperature`, which are only ever constructed by `MachineInfoParser.from_detail` from keyword arguments — there, forbidding extras is a typo check on our own parser.
+
+The one cost of `extra="allow"` on inbound models: a typo'd `alias=` stops raising and silently becomes an extra field. Keep asserting on parsed *values* in fixtures rather than just successful construction, which is what still catches it.
 
 ### Why TCP Bootstrap Is Still Required for Modern Printers
 The HTTP `/detail` endpoint requires authentication (`serialNumber` + `checkCode` via `FNetCode`). During discovery and the very first connection attempt — before a check code has been entered — there are no credentials, so the parser cannot read `pid` from `/detail`. The library handles this by:
@@ -308,6 +321,10 @@ The HTTP `/detail` endpoint requires authentication (`serialNumber` + `checkCode
 - FlashForge Adventurer 5M / 5M Pro
 - FlashForge Adventurer 4
 
+**Full Support** (HTTP only — no TCP/8899 service):
+- FlashForge Creator 5
+- FlashForge Creator 5 Pro
+
 **Partial Support** (TCP only):
 - FlashForge Adventurer 3
 
@@ -327,7 +344,7 @@ The HTTP `/detail` endpoint requires authentication (`serialNumber` + `checkCode
 **Imaging** (optional `[imaging]`):
 - `pillow>=10.0.0` - For thumbnail image processing
 
-**Python version**: Requires Python 3.8+
+**Python version**: Requires Python 3.11+
 
 ## Common Gotchas
 

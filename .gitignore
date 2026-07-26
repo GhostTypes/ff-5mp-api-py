@@ -119,3 +119,6 @@ test_*.png
 
 # PyPI credentials
 .pypirc
+
+# Local codegraph index (tooling artifact)
+.codegraph/
