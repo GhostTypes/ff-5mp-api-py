@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2026-07-26
+
+### Changed
+
+- **Diagnostic output now goes to the `logging` module instead of `print()`.** 95 `print()` calls across 10 modules were the library's only record of why an operation failed — and under Home Assistant, the largest consumer, stdout reaches nowhere the user can see. Every silent failure therefore looked identical from the outside: a `/detail` response the library could not parse, an unreachable printer, and a rejected check code all produced the same bare `None` or `False` with no explanation anywhere. That is the ambiguity behind both reports on `ff-5mp-hass#18`, where one reporter concluded their check code was wrong and another concluded the integration needed TCP port 8899; neither could see the actual cause. Failures and refused commands now log at `WARNING`, request/response tracing at `DEBUG`, under per-module loggers (`flashforge.api.controls.info`, `…job_control`, and so on) so consumers can raise the level for one area alone. Two intentional exceptions remain on stdout: `FlashForgePrinterDiscovery.print_debug_info()`, whose entire purpose is to dump a hex/ASCII view for a human, and the `_async_main` CLI demo.
+
+### Security
+
+- **Credentials, network identifiers, and cloud registration codes are redacted from logs.** Moving diagnostics into `logging` would otherwise have written secrets to a file users routinely paste into bug reports. The upload paths logged their full HTTP headers — including `serialNumber` and `checkCode`, which together are complete control of the printer over the LAN API — and `send_control_command` printed its whole payload, credentials included, on *every single command*. The new `flashforge.api.misc.redaction` helpers mask `serialNumber`, `checkCode`, `macAddr`, `ipAddr`, `flashRegisterCode`, and `polarRegisterCode` (in both firmware camelCase and library snake_case, recursing into nested structures) before any value can be formatted into a log record. The key set deliberately matches what `ff-5mp-hass` already strips from its diagnostics download, so a log paste and a diagnostics upload cannot disagree about what is safe to share.
+
 ## [1.3.2] - 2026-07-26
 
 ### Fixed
@@ -193,7 +203,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Type hints for all public APIs
 - Inline code documentation
 
-[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.3.2...HEAD
+[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.3.3...HEAD
+[1.3.3]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.2.3...v1.3.0
