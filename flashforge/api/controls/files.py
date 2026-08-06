@@ -69,8 +69,19 @@ class Files:
     async def get_recent_file_list(self) -> list[FFGcodeFileEntry]:
         """
         Retrieves a list of the 10 most recently printed files from the printer's API.
-        For AD5X and newer printers, returns detailed file entries with material info.
-        For older printers, returns basic file entries with normalized data.
+
+        Only the **AD5X** answers with `gcodeListDetail`, the per-file block carrying
+        print time, filament weight, and the per-tool material data that material
+        matching is built from. Every other model - the 5M, the 5M Pro, **and the
+        Creator 5 / Creator 5 Pro** - returns bare file names, and their entries come
+        back with `gcode_tool_datas=None` and `printing_time=0`.
+
+        The Creator 5 is the surprise there, and it is firmware, not a parsing gap:
+        it is a newer printer than the AD5X but reports less (confirmed against a
+        Creator 5 Pro, 2026-08-05). Do not describe this method as "AD5X and newer" -
+        that phrasing cost a downstream integration three releases of chasing a bug
+        that was never in the code. Callers that need per-tool data on a Creator 5
+        must parse the 3mf themselves at upload time.
 
         Returns:
             A list of FFGcodeFileEntry objects. Returns an empty list if the request fails or an error occurs.
@@ -125,7 +136,8 @@ class Files:
                         return entries
                     return []
 
-                # AD5X and newer printers provide detailed info in gcodeListDetail
+                # Only the AD5X provides detailed info in gcodeListDetail. The
+                # Creator 5 series does not, despite being the newer hardware.
                 if result.gcode_list_detail and len(result.gcode_list_detail) > 0:
                     return result.gcode_list_detail
 
