@@ -208,3 +208,48 @@ async def test_convenience_wrappers_absorb_response_errors():
     assert await info.is_printing() is False
     assert await info.get_status() is None
     assert await info.get_machine_state() is None
+
+
+# --------------------------------------------------------------------------- #
+# Status mapping
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    ("reported", "expected"),
+    [
+        ("ready", MachineState.READY),
+        ("printing", MachineState.PRINTING),
+        ("pausing", MachineState.PAUSING),
+        ("paused", MachineState.PAUSED),
+        # A Creator 5 Pro reports "pause", not the documented "paused".
+        ("pause", MachineState.PAUSED),
+        ("PAUSE", MachineState.PAUSED),
+        # Sent while a file is being transferred to the printer.
+        ("downloading", MachineState.BUSY),
+        ("completed", MachineState.COMPLETED),
+    ],
+)
+def test_machine_state_mapping(reported, expected):
+    """Every status a real printer has been seen to report must map."""
+    assert MachineInfoParser._get_machine_state(reported) is expected
+
+
+def test_unmapped_status_is_unknown_and_logged(caplog):
+    """An unrecognized status still degrades to UNKNOWN - and says so.
+
+    The warning is the only trace an unmapped value leaves: the state itself
+    becomes UNKNOWN, which is indistinguishable from a printer that reported
+    nothing. Both "pause" and "downloading" were found this way, in a Home
+    Assistant log, after the sensor had been reading "unknown" for a day.
+    """
+    with caplog.at_level("WARNING"):
+        assert MachineInfoParser._get_machine_state("teleporting") is MachineState.UNKNOWN
+
+    assert "teleporting" in caplog.text
+
+
+def test_empty_status_is_unknown_without_a_warning():
+    """No status is not an unexpected status; it must not cry wolf."""
+    assert MachineInfoParser._get_machine_state("") is MachineState.UNKNOWN
+    assert MachineInfoParser._get_machine_state(None) is MachineState.UNKNOWN
