@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A paused Creator 5 Pro no longer reports as "unknown".** The printer sends `status: "pause"`, while the mapping only knew the documented `"pausing"` and `"paused"` — so every pause fell through to `MachineState.UNKNOWN`. In Home Assistant that is the one state that says nothing, and it appeared at exactly the wrong moment: the printer pauses itself when it detects a clog, so the sensor went blank precisely when the user needed to know why the print had stopped. Found in a Home Assistant log carrying 84 `Unknown machine status received: 'pause'` warnings over a single day (pid 41, firmware 1.9.4). `"pause"` now maps to `PAUSED`; `"paused"` still does, because firmware reporting one is no reason to drop the other.
+
+- **`status: "downloading"` is mapped too.** Reported while a file is being transferred to the printer, and likewise unmapped until now. It maps to `BUSY` rather than to a new enum member on purpose: consumers may pin this enum to a fixed list — the Home Assistant integration's Machine Status sensor is a `device_class=ENUM` with an explicit `options` list — so adding a member breaks them until they ship a matching release, while an existing state does not. A dedicated `DOWNLOADING` state is worth discussing, but it is a coordinated change, not a bugfix.
+
 ## [1.3.4] - 2026-07-26
 
 ### Fixed
