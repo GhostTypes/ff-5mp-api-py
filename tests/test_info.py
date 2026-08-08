@@ -249,7 +249,14 @@ def test_unmapped_status_is_unknown_and_logged(caplog):
     assert "teleporting" in caplog.text
 
 
-def test_empty_status_is_unknown_without_a_warning():
-    """No status is not an unexpected status; it must not cry wolf."""
-    assert MachineInfoParser._get_machine_state("") is MachineState.UNKNOWN
-    assert MachineInfoParser._get_machine_state(None) is MachineState.UNKNOWN
+def test_empty_status_is_unknown_without_a_warning(caplog):
+    """No status is not an unexpected status; it must not cry wolf.
+
+    The silence is the point, so it is asserted: a warning here would fire on
+    every poll of an unreachable printer and bury the ones that mean something.
+    """
+    with caplog.at_level("WARNING"):
+        assert MachineInfoParser._get_machine_state("") is MachineState.UNKNOWN
+        assert MachineInfoParser._get_machine_state(None) is MachineState.UNKNOWN
+
+    assert caplog.text == ""
