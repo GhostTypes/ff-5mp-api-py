@@ -302,7 +302,21 @@ class MachineInfoParser:
 
     @staticmethod
     def _get_machine_state(status: str) -> MachineState:
-        """Map raw status strings into the public machine state enum."""
+        """Map raw status strings into the public machine state enum.
+
+        An unmapped value costs the consumer everything the field is for: it
+        becomes ``UNKNOWN``, which in Home Assistant renders as "unknown" - the
+        one state that says nothing, at the moment the user most needs to know
+        what the printer is doing. Both additions below were found that way, in
+        a log full of `Unknown machine status received` while a Creator 5 Pro sat
+        paused on a detected clog.
+
+        Consumers may map this enum onto a fixed set of values - the Home
+        Assistant integration's Machine Status sensor is a `device_class=ENUM`
+        with an explicit `options` list - so a *new* member is a breaking change
+        for them, while mapping onto an existing one is not. Prefer the closest
+        existing state unless a new one is worth coordinating.
+        """
         valid_status = status.lower() if isinstance(status, str) else ""
         state_mapping = {
             "ready": MachineState.READY,
@@ -312,9 +326,20 @@ class MachineInfoParser:
             "heating": MachineState.HEATING,
             "printing": MachineState.PRINTING,
             "pausing": MachineState.PAUSING,
+            # The Creator 5 Pro reports "pause" for a print that is paused,
+            # where the documented value is "paused" - both are mapped, because
+            # firmware that reports one is not a reason to drop the other.
+            # Observed on pid 41, firmware 1.9.4, whenever the printer paused
+            # itself on a detected clog.
+            "pause": MachineState.PAUSED,
             "paused": MachineState.PAUSED,
             "cancel": MachineState.CANCELLED,
             "completed": MachineState.COMPLETED,
+            # Reported while a file is being transferred to the printer. Not a
+            # print, but not idle either, so BUSY is the honest existing fit; a
+            # dedicated state would need consumers to add it to their option
+            # lists first.
+            "downloading": MachineState.BUSY,
         }
 
         if valid_status in state_mapping:
