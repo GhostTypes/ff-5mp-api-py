@@ -514,7 +514,12 @@ class FFMachineInfo(BaseModel):
 
     # Extras
     print_eta: str = "00:00"
-    completion_time: datetime = Field(default_factory=datetime.now)
+    # None whenever the print is not advancing (paused, heating, ready, error,
+    # ...). The firmware freezes `estimatedTime` outside the PRINTING state, so
+    # an absolute timestamp derived from it would recede in real time rather
+    # than hold. Use `print_eta` / `estimated_time` for the remaining duration,
+    # which stays valid in every state.
+    completion_time: datetime | None = None
     formatted_run_time: str = "00:00"
     formatted_total_run_time: str = "0h:0m"
 

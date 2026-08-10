@@ -46,6 +46,19 @@ PID_MODEL_NAMES: dict[int, str] = {
 }
 
 
+# The one state in which the firmware actually counts `estimatedTime` down.
+# Outside it the field freezes at its last value while the wall clock keeps
+# moving, so `now() + estimatedTime` walks forward one minute per minute instead
+# of holding still - a paused print appears to recede forever. The duration
+# stays correct throughout; only its conversion to an absolute timestamp is
+# invalid, which is why `print_eta` is ungated and `completion_time` is not.
+#
+# HEATING is deliberately excluded. The pre-print warmup does not advance the
+# job either, so the same drift applies - it just lasts minutes rather than
+# hours, which is why it is easy to miss.
+_ADVANCING_STATES = frozenset({MachineState.PRINTING})
+
+
 class MachineInfoParser:
     """
     Transforms printer detail data from the API response format into a structured FFMachineInfo object.
@@ -75,7 +88,14 @@ class MachineInfoParser:
             formatted_run_time = MachineInfoParser._format_time_from_seconds(
                 getattr(detail, "print_duration", 0) or 0
             )
-            completion_time = datetime.now() + timedelta(seconds=estimated_time)
+            machine_state = MachineInfoParser._get_machine_state(
+                getattr(detail, "status", "") or ""
+            )
+            completion_time = (
+                datetime.now() + timedelta(seconds=estimated_time)
+                if machine_state in _ADVANCING_STATES
+                else None
+            )
 
             total_minutes = getattr(detail, "cumulative_print_time", 0) or 0
             hours = total_minutes // 60
@@ -255,9 +275,7 @@ class MachineInfoParser:
                 print_speed_adjust=getattr(detail, "print_speed_adjust", 0) or 0,
                 filament_type=getattr(detail, "right_filament_type", "") or "",
                 # Machine state
-                machine_state=MachineInfoParser._get_machine_state(
-                    getattr(detail, "status", "") or ""
-                ),
+                machine_state=machine_state,
                 status=getattr(detail, "status", "") or "",
                 total_print_layers=getattr(detail, "target_print_layer", 0) or 0,
                 tvoc=getattr(detail, "tvoc", 0) or 0,

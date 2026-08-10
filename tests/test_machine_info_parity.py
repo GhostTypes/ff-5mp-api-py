@@ -50,20 +50,65 @@ def test_machine_info_parses_non_ad5x_pro_models():
     assert machine_info.is_pro is True
 
 
-def test_machine_info_sets_completion_time_and_progress_fields():
-    """ETA, completion time, and integer progress mirror the TS library behavior."""
-    before = datetime.now()
+def test_machine_info_sets_eta_and_progress_fields():
+    """ETA and integer progress mirror the TS library behavior."""
     machine_info = _parse_detail(AD5X_INFO_RESPONSE)
-    after = datetime.now()
 
     assert machine_info.print_eta == "01:00"
     assert machine_info.print_progress == 0.25
     assert machine_info.print_progress_int == 25
+
+
+def test_completion_time_is_set_while_printing():
+    """A printing job gets an absolute completion timestamp derived from estimatedTime.
+
+    PRINTING is the only state the firmware counts `estimatedTime` down in, so
+    it is the only state where `now() + estimatedTime` stays put across polls.
+    """
+    payload = deepcopy(AD5X_INFO_RESPONSE)
+    payload["detail"]["status"] = "printing"
+
+    before = datetime.now()
+    machine_info = _parse_detail(payload)
+    after = datetime.now()
+
+    assert machine_info.completion_time is not None
     assert (
         before + timedelta(seconds=3590)
         <= machine_info.completion_time
         <= after + timedelta(seconds=3610)
     )
+
+
+def test_completion_time_is_none_when_the_print_is_not_advancing():
+    """`estimatedTime` freezes outside the printing states, so no timestamp is derived.
+
+    The firmware stops counting `estimatedTime` down whenever the print is not
+    progressing. Deriving `now() + estimatedTime` on every poll would then walk
+    the completion time forward one minute per minute - a paused print would
+    appear to recede forever. `print_eta` stays populated because the remaining
+    *duration* is still correct; only the absolute timestamp is not.
+
+    HEATING is in this list, not in the advancing one: the pre-print warmup does
+    not advance the job either, so it drifts the same way, just for minutes
+    instead of hours.
+    """
+    for status in (
+        "paused",
+        "pause",
+        "pausing",
+        "heating",
+        "ready",
+        "error",
+        "completed",
+        "cancel",
+    ):
+        payload = deepcopy(AD5X_INFO_RESPONSE)
+        payload["detail"]["status"] = status
+        machine_info = _parse_detail(payload)
+
+        assert machine_info.completion_time is None, status
+        assert machine_info.print_eta == "01:00", status
 
 
 def test_machine_info_detects_ad5x_from_pid_when_renamed_without_matl_station():
