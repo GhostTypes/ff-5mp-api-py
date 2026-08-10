@@ -207,7 +207,8 @@ twine check dist/*
 ```
 
 **Version Management**:
-- Current version: **1.3.3** (as of 2026-07-26)
+- Current version: **1.4.0** (as of 2026-08-10)
+- Two files carry the version and both must be bumped together: `pyproject.toml` (`version = `) and `flashforge/__init__.py` (`__version__ = `). The publish workflow validates only the first, so a mismatched `__version__` ships silently.
 - Package name: `flashforge-python-api`
 - PyPI: https://pypi.org/project/flashforge-python-api/
 - Build system: Hatchling (defined in `pyproject.toml`)
@@ -311,6 +312,20 @@ Range constraints remain correct on **outbound** models (`AD5XMaterialMapping`, 
 TCP `M115` remains available for older printers that actually serve it, and its `Machine Type` field (firmware-controlled, e.g. `"FlashForge Adventurer 5M Pro"`) is safe to read where it exists — its `Machine Name` field is not, being user-set like `detail.name`. It is a legacy path, not part of model detection.
 
 > Known gap: `client.initialize()` → `init_control()` (`client.py:262`) and `get_temperatures()` (`client.py:531`) call the TCP client unguarded and would hang on a Creator 5. Neither is used by `ff-5mp-hass`. Gate them before calling either from new code.
+
+### Derived Timestamps Are Gated on an Advancing Print
+
+`_ADVANCING_STATES` in `api/controls/info.py` contains `MachineState.PRINTING` and nothing else. `FFMachineInfo.completion_time` is `datetime | None` (nullable as of 1.4.0) and is derived only inside that set.
+
+`datetime.now() + estimated_time` only holds still while the firmware counts `estimated_time` down. It freezes that field the moment the print stops advancing, so with one term fixed and the clock still moving the timestamp walks forward a minute per minute — after an hour of a clog pause it claimed the print would finish an hour later than it had when the pause began, and it never stopped receding. **`HEATING` is deliberately excluded**: the pre-print warmup does not advance the job either and drifts identically, just for minutes rather than hours. Do not widen this set to "fix" a `None` during a pause — the `None` is the fix.
+
+`print_eta` and `estimated_time` are ungated and stay correct in every state; the remaining *duration* was never wrong, only its conversion to an absolute timestamp. Prefer them where a duration will do. The bad derivation originates in the C# `ff-5mp-api` (`MachineInfo.cs:210`) that every port inherited; the same gate now exists in `ff-5mp-api-ts`, `ff-5mp-hass`, FlashForgeUI-Electron, and FlashForgeWebUI.
+
+### Status Mapping: Reuse an Existing MachineState, Don't Add One
+
+Firmware sends statuses the documentation does not list. `"pause"` (Creator 5 Pro, firmware 1.9.4 — not the documented `"paused"`) maps to `PAUSED`, and `"downloading"` maps to `BUSY`, both added in 1.3.5. The `"pause"` case matters disproportionately because the printer pauses *itself* on a detected clog, so an unmapped value blanked the state at exactly the moment the user needed to know why the print stopped.
+
+**Map a new status onto an existing `MachineState` member rather than adding one.** A consumer that pins the enum to a fixed list breaks when a member appears; reusing one cannot break anyone. (`ff-5mp-hass` is not such a consumer — its `device_class=ENUM` sensor derives `options` from `MachineState` itself — but other downstreams are.) A dedicated `DOWNLOADING` state is a feature discussion, not a patch-release bugfix. Keep `"paused"` mapped alongside `"pause"`: firmware reporting one is no reason to drop the other.
 
 ### Error Handling
 - HTTP errors: Wrapped in aiohttp exceptions
