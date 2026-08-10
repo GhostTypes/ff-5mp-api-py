@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.4.0] - 2026-08-10
+
+### Fixed
+
+- **`completion_time` no longer recedes while a print is paused.** It was derived as `datetime.now() + estimated_time` on every parse, which is only stable while the firmware is counting `estimatedTime` down. It isn't: the field freezes the moment the print stops advancing, so with the second term fixed and the first still moving, the derived timestamp stepped forward one minute per minute — after an hour of a clog pause it claimed the print would finish an hour later than it had when the pause began, and it never stopped receding. `completion_time` is now `None` unless `machine_state` is `PRINTING` — `HEATING` is excluded for the same reason as the paused states, since the pre-print warmup does not advance the job either and drifts identically, just for minutes rather than hours. Found while checking whether the Creator 5 Pro clog fix in 1.3.5 left the ETA sensible; the same derivation exists in `ff-5mp-api-ts` and in four display sites across FlashForgeUI-Electron and FlashForgeWebUI, all fixed alongside. It originates in the C# `ff-5mp-api` (`MachineInfo.cs:210`), which every port inherited it from.
+
+### Changed
+
+- **BREAKING: `FFMachineInfo.completion_time` is now `datetime | None`** (was `datetime`, defaulting to `datetime.now()`). Consumers that read it without a `None` check need one. `print_eta` and `estimated_time` are unchanged and stay correct in every state — the remaining *duration* was never wrong, only its conversion to an absolute timestamp. Prefer them where a duration will do.
+
 ## [1.3.5] - 2026-08-08
 
 ### Fixed
@@ -235,7 +247,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Type hints for all public APIs
 - Inline code documentation
 
-[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.3.3...HEAD
+[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.3.5...v1.4.0
+[1.3.5]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.3.4...v1.3.5
+[1.3.4]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.3.3...v1.3.4
 [1.3.3]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/GhostTypes/ff-5mp-api-py/compare/v1.3.0...v1.3.1
