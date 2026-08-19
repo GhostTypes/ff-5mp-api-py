@@ -11,5 +11,5 @@ class Commands:
     TEMP_CONTROL_CMD = "temperatureCtl_cmd"
     # AD5X + Creator 5 material-station slot metadata (name + color). Filament
     # load/unload (`ms_cmd`) stays AD5X-only — the Creator 5 firmware has no
-    # `ms_cmd` (confirmed via Ghidra RE).
+    # `ms_cmd` (verified in the firmware).
     MATERIAL_STATION_CONFIG_CMD = "msConfig_cmd"

@@ -215,7 +215,7 @@ async def test_set_tool_temps_rejects_wrong_length():
 
 # ---------------------------------------------------------------------------
 # Creator 5 (isCreator5) drives its tools ONLY via the `nozzles` array; the
-# firmware's doTemperatureControl handler never reads rightNozzle/leftNozzle.
+# firmware's temperature-control handler never reads rightNozzle/leftNozzle.
 # The generic set/cancel_extruder_temp must therefore emit a 4-element
 # `nozzles` array targeting the primary tool (T0).
 # ---------------------------------------------------------------------------

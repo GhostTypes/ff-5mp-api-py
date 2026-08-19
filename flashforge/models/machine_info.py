@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 # blast radius: pydantic fails a model as a unit, and `Info.get_detail_response`
 # turns any failure into "no data", which Home Assistant shows as an offline
 # printer. So a `ge=0` on a field nobody reads could take the whole integration
-# down. That is exactly what happened in issue #18, where a Creator 5 reporting
+# down. That is exactly what happened in ff-5mp-hass#18, where a Creator 5 reporting
 # `chamberTemp: -108` made every entity unavailable and the config flow report
 # `cannot_connect`.
 #
@@ -369,7 +369,7 @@ class FFPrinterDetail(BaseModel):
     z_axis_compensation: float | None = Field(default=None, alias="zAxisCompensation")
 
     # Firmware reports absent temperature hardware with a negative sentinel
-    # (-108 on a chamber-less Creator 5, issue #18) rather than by omitting the
+    # (-108 on a chamber-less Creator 5, ff-5mp-hass#18) rather than by omitting the
     # field. Map those to None here so "no sensor" reads as "not reported"
     # everywhere downstream, instead of as a -108 C reading or a hard failure.
     @field_validator(

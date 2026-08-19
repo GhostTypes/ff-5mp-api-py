@@ -237,8 +237,8 @@ class Control:
         This information is shown on the printer UI and used for print validation; it
         does not move any filament. Available on the AD5X and the Creator 5 / Creator 5 Pro.
 
-        The ``msConfig_cmd`` handler is firmware-confirmed present on the Creator 5
-        (Ghidra RE of ``firmwareExe`` 1.9.2). The Creator 5 has no removable IFS; it
+        The ``msConfig_cmd`` handler is confirmed present on the Creator 5
+        (verified in firmware 1.9.2). The Creator 5 has no removable IFS; it
         surfaces its 4 tool heads as the 4 "slots", so this sets per-tool material
         metadata. Both models share the same ``OrcaServer`` command path and wire
         format. Note that **filament load/unload (``slotAction`` / ``ms_cmd``)

@@ -27,12 +27,12 @@ TEMP_OFF = -100
 # Value that turns a tool/nozzle OFF inside the `nozzles` array. Unlike the scalar
 # heater fields (which accept TEMP_OFF = -100), the Creator 5 firmware's
 # per-nozzle parser only treats a literal 0 as "off" — it ignores -100 in the
-# `nozzles` array and the tool keeps heating. (Firmware-confirmed via tester
-# report; this is the v1.6.1 nozzle-off bugfix.)
+# `nozzles` array and the tool keeps heating (observed on live hardware;
+# this is the v1.6.1 nozzle-off bugfix).
 NOZZLE_OFF = 0
 # Number of tool/nozzle entries the Creator 5 firmware requires in the
 # `nozzles` array. The firmware ignores the array unless its length is exactly
-# this (confirmed via Ghidra: `size() == 4` check in the temp parser).
+# this (verified in the firmware).
 NOZZLE_COUNT = 4
 
 
@@ -188,7 +188,7 @@ class TempControl:
         """
         if self.client.http_only:
             # Creator 5 tools are driven ONLY via the `nozzles` array — the
-            # firmware's doTemperatureControl handler never reads
+            # firmware's temperature-control handler never reads
             # rightNozzle/leftNozzle. Target the primary tool (T0): the active
             # tool isn't reliably known over HTTP, so callers that need a
             # specific tool should use set_tool_temp(index, temp).

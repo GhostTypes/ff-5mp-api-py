@@ -404,7 +404,7 @@ class Info:
         if machine_info is None:
             # We validated the payload but could not build our own model from
             # it - that is a bug on our side, not an unreachable printer, and
-            # reporting it as the latter is what issue #18 was about.
+            # reporting it as the latter is what ff-5mp-hass#18 was about.
             raise FlashForgeResponseError(
                 "The /detail payload was read but could not be converted into machine info",
                 endpoint=Endpoints.DETAIL,
@@ -462,7 +462,7 @@ class Info:
         This exists so callers can inspect identity fields - above all `pid` -
         without first having to successfully validate the ~50 unrelated fields
         in the payload. A supported printer must never be rejected because of a
-        field that has nothing to do with whether it is supported (issue #18).
+        field that has nothing to do with whether it is supported (ff-5mp-hass#18).
 
         Returns:
             The decoded response body, or None if the printer could not be

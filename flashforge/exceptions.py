@@ -15,7 +15,7 @@ class FlashForgeResponseError(FlashForgeError):
 
     This is deliberately distinct from a ``None`` return, which every HTTP
     control method uses for "could not reach the printer / the printer refused
-    us". Collapsing the two is what made issue #18 take three releases to
+    us". Collapsing the two is what made ff-5mp-hass#18 take three releases to
     diagnose: a Creator 5 reporting ``chamberTemp: -108`` (the firmware's "no
     chamber sensor" sentinel) surfaced in Home Assistant as ``cannot_connect``,
     pointing the user at their network for a schema problem.

@@ -78,10 +78,9 @@ class Files:
 
         The Creator 5 is the surprise there, and it is firmware, not a parsing gap:
         it is a newer printer than the AD5X but reports less (confirmed against a
-        Creator 5 Pro, 2026-08-05). Do not describe this method as "AD5X and newer" -
-        that phrasing cost a downstream integration three releases of chasing a bug
-        that was never in the code. Callers that need per-tool data on a Creator 5
-        must parse the 3mf themselves at upload time.
+        live Creator 5 Pro, 2026-08-05). Do not describe this method as "AD5X and
+        newer" - only the AD5X answers with `gcodeListDetail`. Callers that need
+        per-tool data on a Creator 5 must parse the 3mf themselves at upload time.
 
         Returns:
             A list of FFGcodeFileEntry objects. Returns an empty list if the request fails or an error occurs.

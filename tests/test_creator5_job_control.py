@@ -89,7 +89,7 @@ def test_is_new_firmware_numeric_compare_still_applies_to_5m():
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_start_creator5_job_multi_tool_body():
-    """POSTs the Creator 5-native /printGcode body matching the captured shape."""
+    """POSTs the Creator 5-native /printGcode body the FlashForge app sends."""
     client = _build_client()
     client.is_creator5 = True
     mock_session, _ = _mock_session({"code": 0, "message": "Success"})
@@ -125,7 +125,7 @@ async def test_start_creator5_job_multi_tool_body():
     url = mock_session.post.call_args.args[0]
     assert url == f"http://192.168.1.120:8898{Endpoints.GCODE_PRINT}"
     body = mock_session.post.call_args.kwargs["json"]
-    # Confirmed C5 capture: flowCalibration/timeLapseVideo always present,
+    # Confirmed on a live C5: flowCalibration/timeLapseVideo always present,
     # mappings carry colors (same shape as AD5X), and no useMatlStation /
     # gcodeToolCnt / firstLayerInspection.
     assert body == {
