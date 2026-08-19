@@ -303,24 +303,21 @@ class Control:
         logger.debug("Sending control command %s with args %s", command, args)
 
         try:
-            await self.client.is_http_client_busy()
-
             session = await self.client.get_http_session()
-            async with session.post(
-                self.client.get_endpoint(Endpoints.CONTROL),
-                json=payload,
-                headers={"Content-Type": "application/json"},
-            ) as response:
-                data = await json_from_response(response)
-                logger.debug("Control command %s reply: %s", command, data)
+            async with self.client.command_lock:
+                async with session.post(
+                    self.client.get_endpoint(Endpoints.CONTROL),
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                ) as response:
+                    data = await json_from_response(response)
+                    logger.debug("Control command %s reply: %s", command, data)
 
-                return NetworkUtils.is_ok(data)
+                    return NetworkUtils.is_ok(data)
 
         except Exception as e:
             logger.warning("Error in send_control_command (%s): %s", command, e)
             return False
-        finally:
-            self.client.release_http_client()
 
     async def send_job_control_cmd(self, command: str) -> bool:
         """

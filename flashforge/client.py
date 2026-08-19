@@ -75,6 +75,15 @@ class FlashForgeClient:
         self._http_client_event = asyncio.Event()
         self._http_client_event.set()  # Not busy initially
 
+        # FIFO mutex for command submission. asyncio.Lock hands the lock to
+        # waiters in the order they asked for it. So command POSTs run one at
+        # a time, in submission order. Scope: command POSTs only (/control,
+        # /product, /printGcode). File uploads (/uploadGcode) and read/poll
+        # POSTs (/detail, /gcodeList, /gcodeThumb) stay outside the lock. An
+        # upload can run for minutes; pause and stop must never queue behind
+        # one.
+        self._command_lock = asyncio.Lock()
+
         # TCP client setup
         tcp_options = None
         if options and options.tcp_port is not None:
@@ -201,6 +210,19 @@ class FlashForgeClient:
             timeout = aiohttp.ClientTimeout(total=self._HTTP_TIMEOUT)
             self._http_session = aiohttp.ClientSession(timeout=timeout, headers={"Accept": "*/*"})
         return self._http_session
+
+    @property
+    def command_lock(self) -> asyncio.Lock:
+        """
+        The FIFO lock that serializes command-submission HTTP POSTs.
+
+        Command POSTs (/control, /product, /printGcode) hold this lock while
+        the request is in flight. asyncio.Lock serves waiters in arrival order,
+        so concurrent commands run one at a time, first come first served.
+        Uploads and read/poll requests never take this lock. So a long upload
+        cannot delay a pause or stop command.
+        """
+        return self._command_lock
 
     async def initialize(self) -> bool:
         """
@@ -442,43 +464,42 @@ class FlashForgeClient:
         """
         Sends a product command to the printer to retrieve control states.
 
-        This method sets the http_client_busy flag while the request is in progress.
+        This method holds the command lock while the request is in progress.
 
         Returns:
             True if the product command is sent successfully and valid data is received,
             False otherwise
         """
-        self._http_client_busy = True
-
         payload = {"serialNumber": self.serial_number, "checkCode": self.check_code}
 
         try:
             session = await self._ensure_http_session()
-            async with session.post(
-                self.get_endpoint(Endpoints.PRODUCT),
-                json=payload,
-                headers={"Content-Type": "application/json"},
-            ) as response:
-                if response.status != 200:
-                    return False
+            async with self._command_lock:
+                async with session.post(
+                    self.get_endpoint(Endpoints.PRODUCT),
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                ) as response:
+                    if response.status != 200:
+                        return False
 
-                data = await json_from_response(response)
+                    data = await json_from_response(response)
 
-                # Validate response structure
-                if not NetworkUtils.is_ok(data):
-                    return False
+                    # Validate response structure
+                    if not NetworkUtils.is_ok(data):
+                        return False
 
-                # Parse product response and set control states
-                product_response = ProductResponse(**data)
-                if product_response and product_response.product:
-                    product = product_response.product
-                    self.product_info = product
-                    self._detected_led_control = product.lightCtrlState != 0
-                    self._detected_filtration_control = not (
-                        product.internalFanCtrlState == 0 or product.externalFanCtrlState == 0
-                    )
-                    self._apply_feature_overrides()
-                    return True
+                    # Parse product response and set control states
+                    product_response = ProductResponse(**data)
+                    if product_response and product_response.product:
+                        product = product_response.product
+                        self.product_info = product
+                        self._detected_led_control = product.lightCtrlState != 0
+                        self._detected_filtration_control = not (
+                            product.internalFanCtrlState == 0 or product.externalFanCtrlState == 0
+                        )
+                        self._apply_feature_overrides()
+                        return True
 
         except ValidationError as error:
             # Distinct from a rejected check code, and it must not read as one:
@@ -496,8 +517,6 @@ class FlashForgeClient:
         except Exception as error:
             logger.warning("Error in send_product_command: %s", error)
             return False
-        finally:
-            self._http_client_busy = False
 
         return False
 

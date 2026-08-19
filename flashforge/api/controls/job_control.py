@@ -253,16 +253,17 @@ class JobControl:
 
         try:
             session = await self.client.get_http_session()
-            async with session.post(
-                self.client.get_endpoint(Endpoints.GCODE_PRINT),
-                json=payload,
-                headers={"Content-Type": "application/json"},
-            ) as response:
-                if response.status != 200:
-                    return False
+            async with self.client.command_lock:
+                async with session.post(
+                    self.client.get_endpoint(Endpoints.GCODE_PRINT),
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                ) as response:
+                    if response.status != 200:
+                        return False
 
-                result = await json_from_response(response)
-                return NetworkUtils.is_ok(result)
+                    result = await json_from_response(response)
+                    return NetworkUtils.is_ok(result)
 
         except Exception as error:
             logger.warning("print_local_file error: %s", error)
@@ -422,16 +423,17 @@ class JobControl:
 
         try:
             session = await self.client.get_http_session()
-            async with session.post(
-                self.client.get_endpoint(Endpoints.GCODE_PRINT),
-                json=payload,
-                headers={"Content-Type": "application/json"},
-            ) as response:
-                if response.status != 200:
-                    return False
+            async with self.client.command_lock:
+                async with session.post(
+                    self.client.get_endpoint(Endpoints.GCODE_PRINT),
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                ) as response:
+                    if response.status != 200:
+                        return False
 
-                result = await json_from_response(response)
-                return NetworkUtils.is_ok(result)
+                    result = await json_from_response(response)
+                    return NetworkUtils.is_ok(result)
 
         except Exception as error:
             logger.warning("AD5X multi-color job error: %s", error)
@@ -474,16 +476,17 @@ class JobControl:
 
         try:
             session = await self.client.get_http_session()
-            async with session.post(
-                self.client.get_endpoint(Endpoints.GCODE_PRINT),
-                json=payload,
-                headers={"Content-Type": "application/json"},
-            ) as response:
-                if response.status != 200:
-                    return False
+            async with self.client.command_lock:
+                async with session.post(
+                    self.client.get_endpoint(Endpoints.GCODE_PRINT),
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                ) as response:
+                    if response.status != 200:
+                        return False
 
-                result = await json_from_response(response)
-                return NetworkUtils.is_ok(result)
+                    result = await json_from_response(response)
+                    return NetworkUtils.is_ok(result)
 
         except Exception as error:
             logger.warning("AD5X single-color job error: %s", error)
@@ -653,16 +656,17 @@ class JobControl:
 
         try:
             session = await self.client.get_http_session()
-            async with session.post(
-                self.client.get_endpoint(Endpoints.GCODE_PRINT),
-                json=payload,
-                headers={"Content-Type": "application/json"},
-            ) as response:
-                if response.status != 200:
-                    return False
+            async with self.client.command_lock:
+                async with session.post(
+                    self.client.get_endpoint(Endpoints.GCODE_PRINT),
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                ) as response:
+                    if response.status != 200:
+                        return False
 
-                result = await json_from_response(response)
-                return NetworkUtils.is_ok(result)
+                    result = await json_from_response(response)
+                    return NetworkUtils.is_ok(result)
 
         except Exception as error:
             logger.warning("Creator 5 job error: %s", error)

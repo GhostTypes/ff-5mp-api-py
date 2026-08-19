@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Concurrent commands no longer interleave on the printer's HTTP API.** The Python port had no serialization on its command paths, so two commands sent at the same moment (say a light toggle racing a pause) could overlap in flight, and the printer — which handles one command at a time — could drop or mis-acknowledge one. Every command-submission POST (`/control`, `/product`, `/printGcode`) now holds one FIFO lock, so commands run one at a time, in the order callers sent them. Uploads (`/uploadGcode`) and read/poll requests (`/detail`, `/gcodeList`, `/gcodeThumb`, camera probes) stay outside the lock on purpose: an upload can run for minutes, and a pause or stop must never queue behind one. A command sent after a failing one still goes through; the lock releases on error. Matches the parallel fix in `ff-5mp-api-ts`. No public API changed.
+
 ## [1.4.0] - 2026-08-10
 
 ### Fixed
