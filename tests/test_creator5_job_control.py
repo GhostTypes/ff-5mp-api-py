@@ -267,8 +267,85 @@ async def test_upload_file_creator5_headers(tmp_path):
     assert headers["flowCalibration"] == "true"
     assert headers["timeLapseVideo"] == "false"
     assert headers["printNow"] == "false"
-    # The C5 has no firstLayerInspection field and maps materials at print-start.
+    # The C5 has no firstLayerInspection field; no mappings were given.
     assert "firstLayerInspection" not in headers
+    assert "materialMappings" not in headers
+
+
+_C5_MAPPING = AD5XMaterialMapping(
+    tool_id=2,
+    slot_id=1,
+    material_name="PLA",
+    tool_material_color="#4DA3FF",
+    slot_material_color="#4DA3FF",
+)
+
+
+@pytest.mark.asyncio
+async def test_upload_file_creator5_sends_mappings_header_when_starting(tmp_path):
+    """With start_print, mappings go out as the base64 materialMappings header."""
+    import base64
+
+    client = _build_client()
+    client.is_creator5 = True
+    test_file = tmp_path / "part.3mf"
+    test_file.write_bytes(b"binary")
+
+    mock_session, _ = _mock_session({"code": 0, "message": "Success"})
+
+    with patch("aiohttp.ClientSession", return_value=mock_session):
+        with patch("flashforge.api.controls.job_control.NetworkUtils.is_ok", return_value=True):
+            result = await client.job_control.upload_file_creator5(
+                Creator5UploadParams(
+                    file_path=str(test_file),
+                    start_print=True,
+                    leveling_before_print=False,
+                    use_matl_station=True,
+                    gcode_tool_cnt=1,
+                    material_mappings=[_C5_MAPPING],
+                )
+            )
+
+    assert result is True
+    headers = mock_session.post.call_args.kwargs["headers"]
+    decoded = json.loads(base64.b64decode(headers["materialMappings"]).decode("utf-8"))
+    assert decoded == [
+        {
+            "toolId": 2,
+            "slotId": 1,
+            "materialName": "PLA",
+            "toolMaterialColor": "#4DA3FF",
+            "slotMaterialColor": "#4DA3FF",
+        }
+    ]
+    assert "firstLayerInspection" not in headers
+
+
+@pytest.mark.asyncio
+async def test_upload_file_creator5_skips_mappings_without_start(tmp_path):
+    """Without start_print, mappings stay off the upload (firmware would keep them)."""
+    client = _build_client()
+    client.is_creator5 = True
+    test_file = tmp_path / "part.3mf"
+    test_file.write_bytes(b"binary")
+
+    mock_session, _ = _mock_session({"code": 0, "message": "Success"})
+
+    with patch("aiohttp.ClientSession", return_value=mock_session):
+        with patch("flashforge.api.controls.job_control.NetworkUtils.is_ok", return_value=True):
+            result = await client.job_control.upload_file_creator5(
+                Creator5UploadParams(
+                    file_path=str(test_file),
+                    start_print=False,
+                    leveling_before_print=False,
+                    use_matl_station=True,
+                    gcode_tool_cnt=1,
+                    material_mappings=[_C5_MAPPING],
+                )
+            )
+
+    assert result is True
+    headers = mock_session.post.call_args.kwargs["headers"]
     assert "materialMappings" not in headers
 
 

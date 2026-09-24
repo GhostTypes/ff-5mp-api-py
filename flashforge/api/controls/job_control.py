@@ -493,24 +493,42 @@ class JobControl:
             raise error
 
     # --- Creator 5 / Creator 5 Pro ---
-    # The Creator 5 splits the material-station workflow across two requests,
-    # unlike the AD5X (which maps materials at upload time). On the C5:
-    #   1. Upload the file (POST /uploadGcode). The firmware reads `useMatlStation`
-    #      and `gcodeToolCnt` here to register the file as a multi-tool job. There
-    #      is NO `firstLayerInspection` header (the field doesn't exist on the
-    #      C5), and the booleans are checked as the string "true"/"false".
-    #   2. Start the print (POST /printGcode) with the per-tool
-    #      `materialMappings`. See start_creator5_job.
+    # The Creator 5 firmware applies material mappings in two places:
+    #   - POST /printGcode reads `materialMappings` for any file already on the
+    #     printer (see start_creator5_job). This is the recommended path: upload
+    #     with start_print=False, then start with the mappings.
+    #   - POST /uploadGcode also reads a base64 `materialMappings` header, the
+    #     same format as the AD5X, and applies it when `printNow` is true.
+    # The firmware only logs `useMatlStation` and `gcodeToolCnt` on upload; they
+    # have no effect. There is NO `firstLayerInspection` header (the field doesn't
+    # exist on the C5), and the booleans are checked as the string "true"/"false".
+    #
+    # Mappings only take effect for a .3mf file. Without mappings, tool N prints
+    # from the slot with the slicer's filament number (filament 1 -> slot 1),
+    # whatever is loaded there. Send a mapping for every tool, including a
+    # single-tool print.
 
     async def upload_file_creator5(self, params: Creator5UploadParams) -> bool:
         """
         Uploads a file (.gcode or .3mf) to a Creator 5 / Creator 5 Pro via
         ``POST /uploadGcode``, with the C5-specific material-station headers.
 
-        Unlike :meth:`upload_file_ad5x` this sends no ``firstLayerInspection``
-        header (the C5 has no such field) and no ``materialMappings`` header (the
-        C5 maps materials at print-start, not upload). Booleans are sent as the
-        string "true"/"false".
+        Recommended flow: upload with ``start_print=False``, then call
+        :meth:`start_creator5_job` with a mapping for every tool. To start in one
+        request instead, pass ``material_mappings`` with ``start_print=True``: the
+        firmware reads them from a base64 ``materialMappings`` header, like the
+        AD5X.
+
+        ``material_mappings`` is sent only when ``start_print`` is true. The
+        firmware keeps upload mappings in memory until the next print ends, so
+        mappings on an upload that does not start would apply to a later,
+        unrelated print.
+
+        ``useMatlStation`` and ``gcodeToolCnt`` are sent for parity with
+        FlashForge's own clients; the firmware only logs them. Unlike
+        :meth:`upload_file_ad5x` this sends no ``firstLayerInspection`` header
+        (the C5 has no such field). Booleans are sent as the string
+        "true"/"false".
 
         Args:
             params: Creator 5 upload parameters.
@@ -540,8 +558,7 @@ class JobControl:
 
         try:
             # C5 upload headers. No firstLayerInspection (absent on the C5);
-            # booleans sent as "true"/"false" (firmware checks for "true"); no
-            # materialMappings header (C5 maps at print-start, not upload).
+            # booleans sent as "true"/"false" (firmware checks for "true").
             custom_headers = {
                 "serialNumber": self.client.serial_number,
                 "checkCode": self.client.check_code,
@@ -554,6 +571,20 @@ class JobControl:
                 "gcodeToolCnt": str(params.gcode_tool_cnt),
                 "Expect": "100-continue",
             }
+
+            mappings = params.material_mappings or []
+            if mappings:
+                if not params.start_print:
+                    logger.warning(
+                        "upload_file_creator5: material_mappings ignored because start_print "
+                        "is False; pass them to start_creator5_job instead."
+                    )
+                else:
+                    if not self._validate_creator5_material_mappings(mappings):
+                        return False
+                    custom_headers["materialMappings"] = self._encode_material_mappings_to_base64(
+                        mappings
+                    )
 
             logger.debug("Creator 5 upload request headers: %s", redact_mapping(custom_headers))
 
@@ -603,13 +634,17 @@ class JobControl:
         """
         Starts a local print on a Creator 5 / Creator 5 Pro via ``POST /printGcode``.
 
-        This is the Creator 5's print-start material-matching command (distinct
-        from the AD5X, which maps materials at upload time). The file must already
-        be on the printer. Provide ``material_mappings`` for a multi-tool print, or
-        omit them for a single-tool print. Sends only the fields the Creator 5
-        firmware reads: NO ``useMatlStation`` / ``gcodeToolCnt`` (those live on the
-        upload) and NO ``firstLayerInspection`` (doesn't exist on the C5).
-        ``flowCalibration`` and ``timeLapseVideo`` are always present (default False).
+        This is the Creator 5's print-start material-matching command. The file
+        must already be on the printer; it can be a file uploaded long before, not
+        only the last upload. Sends only the fields the Creator 5 firmware reads:
+        NO ``useMatlStation`` / ``gcodeToolCnt`` and NO ``firstLayerInspection``
+        (doesn't exist on the C5). ``flowCalibration`` and ``timeLapseVideo`` are
+        always present (default False).
+
+        Provide a mapping for every tool, including a single-tool print. Without
+        mappings the firmware prints each tool from the slot with the slicer's
+        filament number (filament 1 -> slot 1), whatever is loaded there.
+        Mappings take effect only for a .3mf file.
 
         Args:
             params: File name, leveling flag, and optional flags / material mappings.

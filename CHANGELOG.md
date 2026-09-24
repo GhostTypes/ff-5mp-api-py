@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`Creator5UploadParams.material_mappings`.** The Creator 5 firmware reads a base64 `materialMappings` upload header, the same format as the AD5X, and applies it when the upload starts the print (confirmed by firmware analysis of 1.9.6 and 1.9.8, Creator 5 and Creator 5 Pro). `upload_file_creator5` now sends the header when `start_print` is true and the mappings are valid. With `start_print` false the mappings are not sent and a warning is logged: the firmware keeps upload mappings in memory until the next print ends, so they would apply to a later, unrelated print. The recommended flow is unchanged: upload without starting, then call `start_creator5_job` with the mappings.
+
+### Changed
+
+- **Creator 5 documentation corrected.** The firmware only logs `useMatlStation` and `gcodeToolCnt` on upload. `/printGcode` applies mappings to any file on the printer, not only the last upload. Without mappings, each tool prints from the slot with the slicer's filament number (filament 1 prints from slot 1), whatever is loaded there, so send a mapping for every tool, including a single-tool print. Mappings take effect only for a `.3mf` file.
+
 ### Fixed
 
 - **Concurrent commands no longer interleave on the printer's HTTP API.** The Python port had no serialization on its command paths, so two commands sent at the same moment (say a light toggle racing a pause) could overlap in flight, and the printer — which handles one command at a time — could drop or mis-acknowledge one. Every command-submission POST (`/control`, `/product`, `/printGcode`) now holds one FIFO lock, so commands run one at a time, in the order callers sent them. Uploads (`/uploadGcode`) and read/poll requests (`/detail`, `/gcodeList`, `/gcodeThumb`, camera probes) stay outside the lock on purpose: an upload can run for minutes, and a pause or stop must never queue behind one. A command sent after a failing one still goes through; the lock releases on error. Matches the parallel fix in `ff-5mp-api-ts`. No public API changed.

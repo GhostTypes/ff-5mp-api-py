@@ -175,12 +175,12 @@ class AD5XUploadParams(BaseModel):
 class Creator5JobParams(BaseModel):
     """Parameters for starting a Creator 5 / Creator 5 Pro local print job.
 
-    Distinct from the AD5X job params: the Creator 5 maps materials at print-start
-    (POST /printGcode) rather than upload time, so the body carries NO
-    ``useMatlStation`` / ``gcodeToolCnt`` / ``firstLayerInspection`` (the latter
-    doesn't exist on the C5). ``flowCalibration`` and ``timeLapseVideo`` are always
-    present (default False); ``material_mappings`` is optional for a single-tool
-    print.
+    The body carries NO ``useMatlStation`` / ``gcodeToolCnt`` /
+    ``firstLayerInspection`` (the latter doesn't exist on the C5).
+    ``flowCalibration`` and ``timeLapseVideo`` are always present (default False).
+    Map every tool, including a single-tool print: without mappings the firmware
+    prints each tool from the slot with the slicer's filament number (filament 1
+    -> slot 1). Mappings take effect only for a .3mf file.
     """
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
@@ -196,16 +196,18 @@ class Creator5JobParams(BaseModel):
     material_mappings: list[AD5XMaterialMapping] | None = Field(
         default=None,
         max_length=4,
-        description="Optional per-tool material mappings (1-4 items); omit for single-tool",
+        description="Per-tool material mappings (1-4 items); recommended for every print",
     )
 
 
 class Creator5UploadParams(BaseModel):
     """Parameters for uploading a file to a Creator 5 / Creator 5 Pro.
 
-    Mirrors the AD5X upload but omits ``firstLayerInspection`` (absent on the C5)
-    and the ``materialMappings`` header (the C5 maps materials at print-start, not
-    upload). The C5 firmware checks the booleans as the string "true"/"false".
+    Mirrors the AD5X upload but omits ``firstLayerInspection`` (absent on the
+    C5). ``material_mappings`` is sent as the base64 ``materialMappings`` header
+    only when ``start_print`` is true. The firmware only logs ``use_matl_station``
+    and ``gcode_tool_cnt``. The C5 firmware checks the booleans as the string
+    "true"/"false".
     """
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
@@ -222,6 +224,11 @@ class Creator5UploadParams(BaseModel):
     use_matl_station: bool = Field(description="Whether this is a multi-tool material-station job")
     gcode_tool_cnt: int = Field(
         ge=1, le=4, description="Number of tools in the G-code (1-4 for the C5)"
+    )
+    material_mappings: list[AD5XMaterialMapping] | None = Field(
+        default=None,
+        max_length=4,
+        description="Optional per-tool material mappings, sent only when start_print is true",
     )
 
 
