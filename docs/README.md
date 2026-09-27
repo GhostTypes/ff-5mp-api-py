@@ -22,6 +22,7 @@ Read [parity.md](parity.md) first if you are comparing both libraries or maintai
 - `FlashForgeClient` for modern printer access
 - `PrinterDiscovery` for new discovery code
 - `FlashForgePrinterDiscovery` only when you need compatibility with older Python callers
+- `parse_3mf` to read the tools and materials of a sliced `.3mf` before upload (see [Sliced 3MF Parsing](api_reference.md#sliced-3mf-parsing))
 
 For modern HTTP printers, the check code is a per-printer credential and must come from user input or saved config.
 

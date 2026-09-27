@@ -240,6 +240,98 @@ Print job management and file operations.
 - `async start_ad5x_single_color_job(params: AD5XSingleColorJobParams) -> bool`  
   Starts single-color print job on AD5X printer.
 
+#### Creator 5 Methods
+
+- `async upload_file_creator5(params: Creator5UploadParams) -> bool`  
+  Uploads a file to a Creator 5 / Creator 5 Pro, with material mappings when `start_print` is true.
+
+- `async start_creator5_job(params: Creator5JobParams) -> bool`  
+  Starts a file already on a Creator 5 / Creator 5 Pro, with per-tool material mappings.
+
+To build the mappings for these methods, parse the 3MF first. See [Sliced 3MF Parsing](#sliced-3mf-parsing).
+
+#### Upload Behavior
+
+These rules apply to `upload_file`, `upload_file_ad5x`, and `upload_file_creator5` (since 1.6.0):
+
+- The methods open and measure the local file in a worker thread, so they do not block the event loop.
+- The methods use `flashforge.api.controls.job_control.UPLOAD_TIMEOUT`. It has no total time limit, a 30-second connect limit, and a 300-second read limit. A large upload over slow Wi-Fi can take as long as it needs.
+- If `file_path` does not exist or is not a regular file (for example, a directory), the method returns `False`.
+
+---
+
+## Sliced 3MF Parsing
+
+### `flashforge.parse_3mf`
+
+Reads a sliced `.3mf` file and returns what a client needs before upload: the filaments (tools) the print uses, their material and color, estimates, the thumbnail, and slicer warnings. The Creator 5 series does not report which tools a stored file uses, so this is the only way to build correct material mappings for that family.
+
+```python
+parse_3mf(source: str | os.PathLike[str] | IO[bytes], *, file_name: str | None = None) -> ThreeMFFile
+```
+
+**Parameters:**
+- `source`: A path to the file, or a binary file object open for reading
+- `file_name` (str | None): The name to report in `ThreeMFFile.file_name`. Defaults to the base name of a path source, or `"unknown.3mf"` for a file object
+
+**Returns:** `ThreeMFFile` (see [Data Models](models.md#sliced-3mf-models))
+
+**Raises:**
+- `FileNotFoundError`: The path does not exist
+- `ThreeMFFormatError`: The file is not a valid ZIP archive, has a corrupt entry, or has malformed or oversized slice metadata
+- `ThreeMFNotSlicedError`: The file holds no sliced plate G-code (a project file)
+- `ThreeMFMultiplePlatesError`: The file holds more than one sliced plate
+
+**Rules:**
+- The parser accepts one sliced plate only. Nobody knows which plate the printer prints from a multi-plate file, so export a single plate from the slicer.
+- `filaments` lists only the filaments the plate uses. Each one keeps its slicer number: a file that uses only filament 3 gives one entry with `filament_id` 3 and `tool_id` 2.
+- Data comes from `Metadata/slice_info.config` in the archive. If that file lists no filaments, the parser reads the comments at the start of the plate G-code instead.
+- The parser reads only small parts of the archive and never decompresses the whole G-code.
+- The call is synchronous. In asyncio code, run it in a worker thread: `await asyncio.to_thread(parse_3mf, path)`.
+
+Tested with output from Orca-FlashForge, OrcaSlicer, Flash Studio, and Snapmaker Orca.
+
+### `flashforge.threemf.printer_family_from_model_id`
+
+```python
+printer_family_from_model_id(model_id: str | None) -> PrinterFamily | None
+```
+
+Maps a slicer printer-model id (for example `Flashforge-AD5X` or `Flashforge-Creator-5-Pro`) to a `PrinterFamily`. The comparison ignores case, spaces, hyphens, and underscores. Returns `None` for an unknown or missing id. `ThreeMFFile.printer_family` calls this for you.
+
+### `flashforge.threemf.translate_warning`
+
+```python
+translate_warning(key: str) -> str
+```
+
+Turns a raw slicer warning key (for example `bed_temperature_too_high_than_filament`) into readable text. An unknown key falls back to a readable form of the key. An empty key gives an empty string. The parser already fills `ThreeMFWarning.message` with this text.
+
+### Size Limits
+
+The parser stops reading at these limits, all importable from `flashforge.threemf`:
+
+| Constant | Value | Part of the archive |
+|----------|-------|---------------------|
+| `MAX_SLICE_INFO_BYTES` | 4 MB | Slice metadata (`slice_info.config`) |
+| `MAX_THUMBNAIL_BYTES` | 8 MB | Plate thumbnail |
+| `MAX_GCODE_HEADER_BYTES` | 1 MB | Start of the plate G-code |
+
+Oversized slice metadata raises `ThreeMFFormatError`. An oversized thumbnail gives `thumbnail_png = None`.
+
+### Exceptions
+
+| Exception | Parent | Meaning |
+|-----------|--------|---------|
+| `ThreeMFError` | `FlashForgeError` | Base class for all 3MF errors |
+| `ThreeMFFormatError` | `ThreeMFError` | Not a readable archive, corrupt entry, or bad slice metadata |
+| `ThreeMFNotSlicedError` | `ThreeMFError` | No sliced plate G-code in the file |
+| `ThreeMFMultiplePlatesError` | `ThreeMFError` | More than one sliced plate; has `plate_count` |
+
+### Imports
+
+`parse_3mf`, `ThreeMFFile`, `ThreeMFFilament`, `ThreeMFWarning`, `PrinterFamily`, and the four exceptions are available from `flashforge`. `printer_family_from_model_id`, `translate_warning`, and the size limits are available from `flashforge.threemf`.
+
 ---
 
 ### `flashforge.api.controls.TempControl`
@@ -470,6 +562,10 @@ Enum for printer operational states.
 
 Raw printer detail response from API. Contains all raw fields from the printer's HTTP API.
 
+### `flashforge.ThreeMFFile`, `ThreeMFFilament`, `ThreeMFWarning`, `PrinterFamily`
+
+The result types of `parse_3mf`. See [Sliced 3MF Models](models.md#sliced-3mf-models) for every field.
+
 ### `flashforge.tcp.parsers.PrinterInfo`
 
 Printer hardware information from TCP.
@@ -602,4 +698,46 @@ await client.job_control.upload_file("model.gcode", start_print=True)
 await client.job_control.pause_print_job()
 await client.job_control.resume_print_job()
 await client.job_control.cancel_print_job()
+```
+
+### Parse a 3MF and Start a Creator 5 Print
+
+```python
+import asyncio
+from flashforge import AD5XMaterialMapping, ThreeMFError, parse_3mf
+from flashforge.models import Creator5JobParams, Creator5UploadParams
+
+try:
+    info = await asyncio.to_thread(parse_3mf, "model.3mf")
+except ThreeMFError as err:
+    print(f"Cannot use this file: {err}")
+    raise
+
+mappings = [
+    AD5XMaterialMapping(
+        tool_id=filament.tool_id,
+        slot_id=filament.tool_id + 1,  # pick the slot from the printer's reported slots
+        material_name=filament.material_name,
+        tool_material_color=filament.color or "#FFFFFF",
+        slot_material_color=filament.color or "#FFFFFF",
+    )
+    for filament in info.filaments
+]
+
+await client.job_control.upload_file_creator5(
+    Creator5UploadParams(
+        file_path="model.3mf",
+        start_print=False,
+        leveling_before_print=True,
+        use_matl_station=True,
+        gcode_tool_cnt=max(info.tool_count, 1),
+    )
+)
+await client.job_control.start_creator5_job(
+    Creator5JobParams(
+        file_name=info.file_name,
+        leveling_before_print=True,
+        material_mappings=mappings,
+    )
+)
 ```

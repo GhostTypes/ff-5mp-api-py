@@ -499,3 +499,16 @@ def test_thumbnail_is_left_out_of_repr():
     result = parse_3mf(FIXTURES / "orca-flashforge-1.3.0_5mpro.3mf")
 
     assert "thumbnail_png" not in repr(result)
+
+
+def test_snapmaker_orca_234_ad5x_two_colors():
+    result = parse_3mf(FIXTURES / "snapmaker-orca-2.3.4_ad5x-2color.3mf")
+
+    assert result.printer_family is PrinterFamily.AD5X
+    assert result.slicer_name == "Snapmaker Orca"
+    assert result.slicer_version == "2.3.4"
+    assert result.estimated_time_s == 4747
+    assert [(f.tool_id, f.material_name, f.color) for f in result.filaments] == [
+        (0, "PLA", "#FFFFFF"),
+        (1, "PLA", "#0D6284"),
+    ]

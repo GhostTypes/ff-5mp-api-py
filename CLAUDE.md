@@ -76,9 +76,12 @@ flashforge/
 │   │   └── fnet_code.py        # FNetCode for authentication
 │   ├── filament/               # Filament handling
 │   └── misc/                   # Utilities (temperature, scientific notation)
-└── models/                     # Pydantic models for API responses
-    ├── responses.py            # All HTTP response models
-    └── machine_info.py         # Machine state and info models
+├── models/                     # Pydantic models for API responses
+│   ├── responses.py            # All HTTP response models
+│   └── machine_info.py         # Machine state and info models
+└── threemf/                    # Sliced 3MF parser (tools/materials before upload)
+    ├── parser.py               # parse_3mf, ThreeMFFile/Filament/Warning, errors, PrinterFamily
+    └── warnings.py             # translate_warning (slicer warning key -> text)
 ```
 
 ### Key Design Patterns
@@ -207,7 +210,7 @@ twine check dist/*
 ```
 
 **Version Management**:
-- Current version: **1.4.0** (as of 2026-08-10)
+- Current version: **1.6.0** (as of 2026-09-27)
 - Two files carry the version and both must be bumped together: `pyproject.toml` (`version = `) and `flashforge/__init__.py` (`__version__ = `). The publish workflow validates only the first, so a mismatched `__version__` ships silently.
 - Package name: `flashforge-python-api`
 - PyPI: https://pypi.org/project/flashforge-python-api/
@@ -326,6 +329,22 @@ TCP `M115` remains available for older printers that actually serve it, and its 
 Firmware sends statuses the documentation does not list. `"pause"` (Creator 5 Pro, firmware 1.9.4 — not the documented `"paused"`) maps to `PAUSED`, and `"downloading"` maps to `BUSY`, both added in 1.3.5. The `"pause"` case matters disproportionately because the printer pauses *itself* on a detected clog, so an unmapped value blanked the state at exactly the moment the user needed to know why the print stopped.
 
 **Map a new status onto an existing `MachineState` member rather than adding one.** A consumer that pins the enum to a fixed list breaks when a member appears; reusing one cannot break anyone. (`ff-5mp-hass` is not such a consumer — its `device_class=ENUM` sensor derives `options` from `MachineState` itself — but other downstreams are.) A dedicated `DOWNLOADING` state is a feature discussion, not a patch-release bugfix. Keep `"paused"` mapped alongside `"pause"`: firmware reporting one is no reason to drop the other.
+
+### Sliced 3MF Parser Rules
+
+`flashforge/threemf/` reads a sliced `.3mf` before upload. It exists because the Creator 5 series does not report which tools a stored file uses, so the 3MF is the only source for correct material mappings on that family. Keep these rules when you change it:
+
+- **Bounded reads only.** Read `Metadata/slice_info.config` (≤ `MAX_SLICE_INFO_BYTES`, 4 MB), the plate PNG (≤ `MAX_THUMBNAIL_BYTES`, 8 MB), and the start of the plate G-code (≤ `MAX_GCODE_HEADER_BYTES`, 1 MB). Never decompress the whole G-code. Check the bytes actually read, not only the size in the ZIP header, because the header can lie.
+- **Synchronous by design.** `parse_3mf` does blocking file I/O. Async callers (Home Assistant, the frontends' backends) must run it in an executor: `await asyncio.to_thread(parse_3mf, path)`. Never call it directly on an event loop.
+- **`tool_id = filament_id - 1`, always.** List only the filaments the plate uses, and keep their slicer numbers. A file that uses only filament 3 gives one entry with `tool_id` 2. Do not renumber the list to 0..n-1: the tool ids must match the slicer's filament numbers in the G-code.
+- **Reject multi-plate files.** More than one `Metadata/plate_N.gcode` raises `ThreeMFMultiplePlatesError`. Which plate the printer prints is unknown, so any mapping would be a guess. A file with no plate G-code raises `ThreeMFNotSlicedError`.
+- **Parity.** Fields match `ThreeMfParser` in the TypeScript `slicer-meta` package, and `warnings.py` matches its `warning-translations.ts`. Change both together.
+
+### Uploads Never Touch Files on the Event Loop
+
+`upload_file`, `upload_file_ad5x`, and `upload_file_creator5` open and measure the local file with `asyncio.to_thread` (see `_local_file_size` in `job_control.py`). Home Assistant reports a blocking `open()` on its loop as an error, and a blocked loop stalls every other task. **Never add a plain `open()`, `stat()`, or `os.path` call to an upload path.** Wrap it in `asyncio.to_thread`. A path that is not a regular file returns `False`, the same as a missing file.
+
+Uploads use `UPLOAD_TIMEOUT` (`total=None`, `sock_connect=30`, `sock_read=300`), not the aiohttp default. The default caps the whole request at 5 minutes, which cut off large uploads over printer Wi-Fi. Keep the connect and read limits: they still catch a printer that stops answering.
 
 ### Error Handling
 - HTTP errors: Wrapped in aiohttp exceptions

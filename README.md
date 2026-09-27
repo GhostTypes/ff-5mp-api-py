@@ -95,6 +95,39 @@ asyncio.run(main())
 - temperature and motion control, including per-nozzle and chamber temperature control (Creator 5)
 - LED, camera, and filtration control where supported
 - AD5X and Creator 5 / Creator 5 Pro material-station, slot configuration, and material mapping
+- sliced 3MF parsing: read the tools, materials, colors, estimates, and thumbnail of a `.3mf` before upload
+
+## Parse a Sliced 3MF
+
+A sliced 3MF tells you which filaments (tools) a print uses. The Creator 5 series does not report this for stored files, so read the 3MF before you upload it. Then build one material mapping per filament.
+
+```python
+import asyncio
+from flashforge import AD5XMaterialMapping, parse_3mf
+
+
+async def build_mappings(path: str) -> list[AD5XMaterialMapping]:
+    # parse_3mf is synchronous file I/O, so run it in a worker thread.
+    info = await asyncio.to_thread(parse_3mf, path)
+    print(f"{info.file_name}: {info.tool_count} tool(s), sliced for {info.printer_family}")
+
+    mappings = []
+    for filament in info.filaments:
+        mappings.append(
+            AD5XMaterialMapping(
+                tool_id=filament.tool_id,      # 0-based: filament 1 is tool 0
+                slot_id=filament.tool_id + 1,  # choose the station slot to print from
+                material_name=filament.material_name,
+                tool_material_color=filament.color or "#FFFFFF",
+                slot_material_color=filament.color or "#FFFFFF",
+            )
+        )
+    return mappings
+```
+
+In a real app, pick `slot_id` and `slot_material_color` from the slots the printer reports. Pass the mappings to `upload_file_creator5` / `start_creator5_job` (Creator 5 series) or `upload_file_ad5x` (AD5X).
+
+`parse_3mf` accepts one sliced plate only. A project file with no sliced G-code raises `ThreeMFNotSlicedError`. A file with more than one sliced plate raises `ThreeMFMultiplePlatesError`. All 3MF errors subclass `ThreeMFError`.
 
 ## Documentation
 

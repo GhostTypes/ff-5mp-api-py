@@ -11,7 +11,8 @@ series does not report a stored file's tools, so for that family, parsing the
 3MF before upload is the only way to map tools to Material Station slots
 correctly.
 
-Tested with output from Orca-FlashForge, OrcaSlicer and Flash Studio. The fields
+Tested with output from Orca-FlashForge, OrcaSlicer, Flash Studio and Snapmaker
+Orca. The fields
 match ``ThreeMfParser`` in the TypeScript ``slicer-meta`` package.
 
 The parser reads only small, bounded parts of the archive: the slice metadata,

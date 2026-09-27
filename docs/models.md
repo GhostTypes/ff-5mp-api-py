@@ -242,6 +242,103 @@ Material/tool data for multi-material prints.
 | `material_color` | `str` | Hex color code |
 | `filament_weight` | `float` | Filament weight for this tool |
 
+## Sliced 3MF Models
+
+`parse_3mf()` returns these models. They describe a sliced `.3mf` file on your computer, before upload. All of them are frozen: you cannot change a field after the parser creates the model.
+
+### ThreeMFFile
+
+What a sliced 3MF says about its print.
+
+**Import**: `from flashforge import ThreeMFFile`
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `file_name` | `str` | The file's base name |
+| `plate_index` | `int` | Index of the sliced plate (1-based) |
+| `printer_model_id` | `Optional[str]` | Printer model id the file was sliced for (e.g. `Flashforge-AD5X`) |
+| `slicer_name` | `Optional[str]` | Slicer name (e.g. `Orca-Flashforge`) |
+| `slicer_version` | `Optional[str]` | Slicer version (e.g. `1.4.2`) |
+| `estimated_time_s` | `Optional[int]` | Slicer's print time estimate (seconds) |
+| `total_weight_g` | `Optional[float]` | Total filament weight (grams) |
+| `first_layer_time_s` | `Optional[float]` | Slicer's first-layer time estimate (seconds) |
+| `layer_count` | `Optional[int]` | Total layer count |
+| `support_used` | `bool` | True if the plate uses supports |
+| `nozzle_diameters` | `list[float]` | Nozzle diameter per extruder (mm) |
+| `object_names` | `list[str]` | Names of the objects on the plate |
+| `filaments` | `list[ThreeMFFilament]` | Filaments the plate uses, sorted by filament id |
+| `warnings` | `list[ThreeMFWarning]` | Warnings the slicer recorded |
+| `thumbnail_png` | `Optional[bytes]` | Plate preview image as PNG bytes (left out of `repr()`) |
+
+**Computed properties**:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `tool_count` | `int` | Number of filaments (tools) the plate uses |
+| `printer_family` | `Optional[PrinterFamily]` | Printer family from `printer_model_id`, or `None` if the id is unknown |
+
+### ThreeMFFilament
+
+One filament (tool) that the sliced plate uses.
+
+**Import**: `from flashforge import ThreeMFFilament`
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `filament_id` | `int` | The slicer's filament number (1-based) |
+| `tool_id` | `int` | Tool id for a material mapping (0-based, always `filament_id - 1`) |
+| `material_name` | `str` | Material type (e.g. "PLA"), or empty |
+| `color` | `str` | Filament color as `#RRGGBB` (upper case), or empty if the file has none |
+| `used_m` | `Optional[float]` | Filament length used (meters) |
+| `used_g` | `Optional[float]` | Filament weight used (grams) |
+
+The list holds only the filaments the plate uses, and each one keeps its slicer number. A file that uses only filament 3 gives one entry with `filament_id` 3 and `tool_id` 2. Use `tool_id` directly as `AD5XMaterialMapping.tool_id`.
+
+### ThreeMFWarning
+
+A warning the slicer recorded for the plate.
+
+**Import**: `from flashforge import ThreeMFWarning`
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `key` | `str` | Raw warning key (e.g. `bed_temperature_too_high_than_filament`) |
+| `message` | `str` | Readable text for the key (from `translate_warning()`) |
+| `level` | `int` | Severity level as the slicer wrote it |
+| `error_code` | `str` | The slicer's error code, or empty |
+
+### PrinterFamily
+
+String enum for the printer model a 3MF was sliced for.
+
+**Import**: `from flashforge import PrinterFamily`
+
+```python
+class PrinterFamily(StrEnum):
+    ADVENTURER_5M = "adventurer_5m"
+    ADVENTURER_5M_PRO = "adventurer_5m_pro"
+    AD5X = "ad5x"
+    CREATOR_5 = "creator_5"
+    CREATOR_5_PRO = "creator_5_pro"
+```
+
+**Usage**:
+```python
+import asyncio
+from flashforge import PrinterFamily, parse_3mf
+
+info = await asyncio.to_thread(parse_3mf, "model.3mf")
+
+if info.printer_family is not PrinterFamily.CREATOR_5_PRO:
+    print(f"Warning: this file was sliced for {info.printer_model_id}")
+
+for filament in info.filaments:
+    print(f"Tool {filament.tool_id}: {filament.material_name} {filament.color} ({filament.used_g} g)")
+
+for warning in info.warnings:
+    print(f"Slicer warning: {warning.message}")
+```
+
 ## TCP Parser Models
 
 ### PrinterInfo
@@ -357,6 +454,11 @@ FlashForgeClient
     └── tcp_client.get_endstop_status() -> EndstopStatus
     └── tcp_client.get_print_status() -> PrintStatus
     └── tcp_client.get_thumbnail() -> ThumbnailInfo
+
+parse_3mf(path) -> ThreeMFFile          (local file, no printer needed)
+    ├── filaments: List[ThreeMFFilament]
+    ├── warnings: List[ThreeMFWarning]
+    └── printer_family: PrinterFamily
 ```
 
 ## Type Safety

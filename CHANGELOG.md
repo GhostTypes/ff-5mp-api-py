@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-27
+
+This release adds a parser for sliced `.3mf` files, so you can learn which tools and materials a print uses before you upload it. It also fixes uploads that blocked the event loop or stopped after five minutes. No public signature changed, so the upgrade is safe for all users.
+
+### Added
+
+- **Sliced 3MF parsing: `parse_3mf()` and the new `flashforge.threemf` subpackage.** The Creator 5 series does not report which tools a stored file uses. For that family, the only way to build correct material mappings is to read the 3MF before upload. `parse_3mf(source, *, file_name=None)` accepts a path or a binary file object and returns a frozen `ThreeMFFile`. The result holds the filaments the plate uses (`ThreeMFFilament`: material, `#RRGGBB` color, length and weight), the plate thumbnail, time and weight estimates, layer count, nozzle diameters, object names, the slicer name and version, the printer model the file was sliced for, and any slicer warnings. Each filament keeps its slicer number as `filament_id` (1-based) and carries `tool_id = filament_id - 1`, the 0-based tool id that `AD5XMaterialMapping` expects. The list holds only the filaments the plate actually uses: a file that uses only filament 3 gives one entry with `tool_id` 2. The data comes from the slice metadata in the archive, with the plate G-code header as a fallback. Tested with output from Orca-FlashForge, OrcaSlicer, Flash Studio, and Snapmaker Orca.
+
+- **Clear errors for files a printer cannot print as one job.** All 3MF errors subclass `ThreeMFError`, which subclasses `FlashForgeError`. `ThreeMFFormatError` means the file is not a readable archive, has a corrupt entry, or has malformed or oversized slice metadata. `ThreeMFNotSlicedError` means the file is a project file with no sliced G-code. `ThreeMFMultiplePlatesError` means the file holds more than one sliced plate; it carries `plate_count`. Nobody knows which plate the printer prints from such a file, so the parser rejects it. Export a single plate from the slicer instead. A missing path raises `FileNotFoundError`.
+
+- **`PrinterFamily` and `printer_family_from_model_id()`.** `ThreeMFFile.printer_family` maps the slicer's printer-model id to `adventurer_5m`, `adventurer_5m_pro`, `ad5x`, `creator_5`, or `creator_5_pro`, so you can warn when a file was sliced for a different printer. An unknown id gives `None`.
+
+- **`translate_warning()`.** OrcaSlicer-family slicers store warnings as raw keys such as `bed_temperature_too_high_than_filament`. The parser turns each key into readable text in `ThreeMFWarning.message`, and `translate_warning()` is available on its own. An unknown key falls back to a readable form of the key. The table matches the one in the TypeScript `slicer-meta` package.
+
+- **Bounded reads.** The parser reads only the slice metadata (limit 4 MB), the plate thumbnail (limit 8 MB), and the start of the plate G-code (limit 1 MB). It never decompresses the whole G-code, so a large or hostile file costs a fixed amount of memory. The limits are available as `MAX_SLICE_INFO_BYTES`, `MAX_THUMBNAIL_BYTES`, and `MAX_GCODE_HEADER_BYTES`. The parser is synchronous: in asyncio code, call it with `await asyncio.to_thread(parse_3mf, path)`.
+
+### Fixed
+
+- **Uploads no longer block the event loop.** `upload_file`, `upload_file_ad5x`, and `upload_file_creator5` opened and measured the local file on the event loop. That stalled every other task during the call, and Home Assistant reported it as a blocking `open()` call. The three methods now open and measure the file in a worker thread.
+
+- **Large uploads over printer Wi-Fi no longer stop after five minutes.** The upload methods used aiohttp's default timeout, which caps the whole request at five minutes. A large file over a slow Wi-Fi link could not finish in that time. Uploads now use `UPLOAD_TIMEOUT`, which has no total cap. A 30-second connect limit and a 300-second read limit still catch a printer that stops answering.
+
+- **A path that is not a regular file now returns `False`.** If you pass a directory (or any other non-file path) to an upload method, the method returns `False`, the same as for a missing file.
+
 ## [1.5.0] - 2026-09-26
 
 ### Added
