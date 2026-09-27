@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-26
+
 ### Added
 
 - **`Creator5UploadParams.material_mappings`.** The Creator 5 firmware reads a base64 `materialMappings` upload header, the same format as the AD5X, and applies it when the upload starts the print (confirmed by firmware analysis of 1.9.6 and 1.9.8, Creator 5 and Creator 5 Pro). `upload_file_creator5` now sends the header when `start_print` is true and the mappings are valid. With `start_print` false the mappings are not sent and a warning is logged: the firmware keeps upload mappings in memory until the next print ends, so they would apply to a later, unrelated print. The recommended flow is unchanged: upload without starting, then call `start_creator5_job` with the mappings.
