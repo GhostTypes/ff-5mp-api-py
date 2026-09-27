@@ -2,6 +2,7 @@
 FlashForge Python API - Job Control Module
 """
 
+import asyncio
 import base64
 import json
 import logging
@@ -28,6 +29,26 @@ if TYPE_CHECKING:
     from .control import Control
 
 logger = logging.getLogger(__name__)
+
+# Uploads can be hundreds of megabytes over printer Wi-Fi, so the aiohttp default
+# (a 5-minute cap on the whole request) is too short. There is no total cap; the
+# connect and response-read limits still catch a printer that stops answering.
+UPLOAD_TIMEOUT = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=300)
+
+
+async def _local_file_size(file_path: str) -> int | None:
+    """
+    Return the size of a local file, or None if it is not a regular file.
+
+    Runs in a worker thread: blocking file I/O on the event loop stalls every
+    other task, and Home Assistant reports it as an error.
+    """
+
+    def _size() -> int | None:
+        path = Path(file_path)
+        return path.stat().st_size if path.is_file() else None
+
+    return await asyncio.to_thread(_size)
 
 
 class JobControl:
@@ -137,14 +158,12 @@ class JobControl:
         Returns:
             True if the file upload (and optional print start) is successful, False otherwise.
         """
-        file_path_obj = Path(file_path)
-
-        if not file_path_obj.exists():
+        file_size = await _local_file_size(file_path)
+        if file_size is None:
             logger.warning("upload_file: file not found at %s", file_path)
             return False
 
-        file_size = file_path_obj.stat().st_size
-        file_name = file_path_obj.name
+        file_name = Path(file_path).name
 
         logger.debug(
             "Starting upload for %s (size=%s, start=%s, level=%s)",
@@ -179,8 +198,8 @@ class JobControl:
             logger.debug("Upload request headers: %s", redact_mapping(custom_headers))
 
             # Create multipart form data
-            async with aiohttp.ClientSession() as session:
-                with open(file_path, "rb") as f:
+            async with aiohttp.ClientSession(timeout=UPLOAD_TIMEOUT) as session:
+                with await asyncio.to_thread(open, file_path, "rb") as f:
                     data = aiohttp.FormData()
                     data.add_field(
                         "gcodeFile", f, filename=file_name, content_type="application/octet-stream"
@@ -290,13 +309,12 @@ class JobControl:
             return False
 
         # Validate file exists
-        file_path_obj = Path(params.file_path)
-        if not file_path_obj.exists():
+        file_size = await _local_file_size(params.file_path)
+        if file_size is None:
             logger.warning("upload_file_ad5x: file not found at %s", params.file_path)
             return False
 
-        file_size = file_path_obj.stat().st_size
-        file_name = file_path_obj.name
+        file_name = Path(params.file_path).name
 
         logger.debug(
             "Starting AD5X upload for %s (size=%s, start=%s, level=%s, tools=%s)",
@@ -332,8 +350,8 @@ class JobControl:
             logger.debug("AD5X upload request headers: %s", redact_mapping(custom_headers))
 
             # Create multipart form data
-            async with aiohttp.ClientSession() as session:
-                with open(params.file_path, "rb") as f:
+            async with aiohttp.ClientSession(timeout=UPLOAD_TIMEOUT) as session:
+                with await asyncio.to_thread(open, params.file_path, "rb") as f:
                     data = aiohttp.FormData()
                     data.add_field(
                         "gcodeFile", f, filename=file_name, content_type="application/octet-stream"
@@ -536,14 +554,12 @@ class JobControl:
         Returns:
             True on success, False otherwise.
         """
-        file_path_obj = Path(params.file_path)
-
-        if not file_path_obj.exists():
+        file_size = await _local_file_size(params.file_path)
+        if file_size is None:
             logger.warning("upload_file_creator5: file not found at %s", params.file_path)
             return False
 
-        file_size = file_path_obj.stat().st_size
-        file_name = file_path_obj.name
+        file_name = Path(params.file_path).name
 
         logger.debug(
             "Starting Creator 5 upload for %s (size=%s, start=%s, level=%s, "
@@ -589,8 +605,8 @@ class JobControl:
             logger.debug("Creator 5 upload request headers: %s", redact_mapping(custom_headers))
 
             # Create multipart form data
-            async with aiohttp.ClientSession() as session:
-                with open(params.file_path, "rb") as f:
+            async with aiohttp.ClientSession(timeout=UPLOAD_TIMEOUT) as session:
+                with await asyncio.to_thread(open, params.file_path, "rb") as f:
                     data = aiohttp.FormData()
                     data.add_field(
                         "gcodeFile", f, filename=file_name, content_type="application/octet-stream"

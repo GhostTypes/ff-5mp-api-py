@@ -127,8 +127,21 @@ from .tcp import (
     FlashForgeTcpClient as TcpClient,
 )
 
+# Sliced 3MF parsing (tools and materials before upload)
+from .threemf import (
+    PrinterFamily,
+    ThreeMFError,
+    ThreeMFFilament,
+    ThreeMFFile,
+    ThreeMFFormatError,
+    ThreeMFMultiplePlatesError,
+    ThreeMFNotSlicedError,
+    ThreeMFWarning,
+    parse_3mf,
+)
+
 FiveMClient = FlashForgeClient
-__version__ = "1.5.0"
+__version__ = "1.6.0"
 __author__ = "FlashForge Python API Contributors"
 __email__ = "notghosttypes@gmail.com"
 __description__ = "Python library for controlling FlashForge 3D printers"
@@ -164,6 +177,16 @@ __all__ = [
     "AD5XUploadParams",
     "GCodeListResponse",
     "ThumbnailResponse",
+    # Sliced 3MF parsing
+    "parse_3mf",
+    "PrinterFamily",
+    "ThreeMFError",
+    "ThreeMFFilament",
+    "ThreeMFFile",
+    "ThreeMFFormatError",
+    "ThreeMFMultiplePlatesError",
+    "ThreeMFNotSlicedError",
+    "ThreeMFWarning",
     # Control classes for advanced usage
     "Control",
     "JobControl",
